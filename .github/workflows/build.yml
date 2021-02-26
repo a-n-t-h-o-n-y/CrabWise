@@ -16,6 +16,7 @@ jobs:
           CC: gcc-10
           CXX: g++-10
         run: |
+          brew install boost
           mkdir build && cd build
           cmake .. && make crabwise
 
@@ -45,6 +46,7 @@ jobs:
           CC: clang
           CXX: clang++
         run: |
+          brew install openssl
           brew install boost
           mkdir build && cd build
           cmake .. && make crabwise
@@ -68,5 +70,7 @@ jobs:
           CC: gcc-10
           CXX: g++-10
         run: |
+          brew install openssl
+          brew install boost
           mkdir build && cd build
           cmake .. && make crabwise
