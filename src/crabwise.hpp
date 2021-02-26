@@ -1,23 +1,23 @@
 #ifndef CRAB_CRABWISE_HPP
 #define CRAB_CRABWISE_HPP
+#include <fstream>
+#include <optional>
+#include <sstream>
 #include <string>
 
 #include <termox/painter/palette/en4.hpp>
 #include <termox/termox.hpp>
 
+#include "coin_drawer.hpp"
 #include "format_money.hpp"
 #include "markets/coinbase.hpp"
 #include "termox/widget/pipe.hpp"
-#include "termox/widget/widgets/notify_light.hpp"
 
 namespace crab {
 
-class Hamburger : public ox::HLabel {
+class Hamburger : public ox::Button {
    public:
-    Hamburger() : ox::HLabel{U"𝍢"}
-    {
-        *this | ox::pipe::align_center() | ox::pipe::fixed_width(3);
-    };
+    Hamburger() : ox::Button{U"𝍢"} { *this | ox::pipe::fixed_width(3); };
 };
 
 class Div : public ox::Widget {
@@ -35,7 +35,7 @@ class Name : public ox::HArray<ox::HLabel, 2> {
     {
         base | ox::pipe::fixed_width(8) | ox::Trait::Bold;
         quote | ox::Trait::Dim;
-        *this | ox::pipe::fixed_width(16);
+        *this | ox::pipe::fixed_width(14);
     }
 
    public:
@@ -49,20 +49,51 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
     Price_display()
     {
         using namespace ox::pipe;
-        symbol | fixed_width(3) | align_center();
-        symbol.set_text(U"$" | ox::Trait::Dim);
+        symbol | fixed_width(3) | align_center() | ox::Trait::Dim;
     }
 
    public:
+    /// Set the currency symbol, x is the all caps abriviation.
+    void set_currency(std::string const& x) { symbol.set_text(to_symbol(x)); }
+
     void set_price(std::string v)
     {
         format_money(v);
+        // offset_decimal(v, 6);
         value.set_text(v);
     }
 
    public:
     ox::HLabel& symbol = this->get<0>();
     ox::HLabel& value  = this->get<1>();
+
+   private:
+    [[nodiscard]] static auto to_symbol(std::string const& x)
+        -> ox::Glyph_string
+    {
+        if (x == "USD")
+            return U"$";
+        if (x == "ETH")
+            return U"Ξ";
+        if (x == "BTC")
+            return U"₿";
+        if (x == "EUR")
+            return U"€";
+        if (x == "GBP")
+            return U"£";
+        if (x == "DAI")
+            return U"◈";
+        if (x == "USDC")
+            return U"ᐥC";
+        return "x";
+    }
+
+    /// inserts spze to make decision at \p decimal_position.
+    static void offset_decimal(std::string& value, int decimal_position)
+    {
+        auto const decimal = value.rfind('.');
+        value.insert(0, decimal_position - decimal, ' ');
+    }
 };
 
 class Percent_display : public ox::HArray<ox::HLabel, 2> {
@@ -181,6 +212,8 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
            std::string const& last_price,
            std::string const& opening_price)
     {
+        listings.last_price.set_currency(currency.quote);
+        listings.opening_price.set_currency(currency.quote);
         listings.name.set_base(currency.base);
         listings.name.set_quote(currency.quote);
         currency_pair_ = currency;
@@ -253,6 +286,9 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
                              coinbase_.opening_price(currency).value);
         child.remove_me.connect(
             [this, cp = child.currency_pair()] { this->remove_ticker(cp); });
+        child.listings.hamburger.pressed.connect(
+            [this, &child] { last_selected_ = &child; });
+        child.listings.hamburger.install_event_filter(*this);
     }
 
     void remove_ticker(Currency_pair currency)
@@ -260,6 +296,8 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         auto const at = this->find_ticker(currency);
         if (at == nullptr)
             return;
+        if (last_selected_ == at)
+            last_selected_ = nullptr;
         this->remove_and_delete_child(at);
     }
 
@@ -269,6 +307,13 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         if (at == nullptr)
             return;
         at->update_last_price(price.value);
+    }
+
+    /// Return list of currency pairs that can be added as Tickers.
+    [[nodiscard]] auto available_currencies() const
+        -> std::vector<Currency_pair> const&
+    {
+        return coinbase_.currency_pairs();
     }
 
    protected:
@@ -285,9 +330,24 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         return Base_t::enable_event();
     }
 
-   public:
+    auto mouse_move_event_filter(Widget& receiver, ox::Mouse const& m)
+        -> bool override
+    {
+        if (m.button != ox::Mouse::Button::Left || last_selected_ == nullptr)
+            return false;
+        auto* ticker       = receiver.parent()->parent();
+        auto const index_a = this->find_child_position(ticker);
+        auto const index_b = this->find_child_position(last_selected_);
+        if (index_a == std::size_t(-1) || index_b == std::size_t(-1))
+            return false;
+        this->swap_children(index_a, index_b);
+        return true;
+    }
+
+   private:
     Coinbase coinbase_;
     ox::Event_loop coinbase_loop_;
+    Ticker* last_selected_ = nullptr;
 
    private:
     void subscribe_to_all()
@@ -321,7 +381,7 @@ class Column_labels : public ox::HArray<ox::HLabel, 7> {
         using namespace ox::pipe;
         *this | fixed_height(1);
         name.set_text(U"Name" | ox::Trait::Bold);
-        name | fixed_width(16);
+        name | fixed_width(14);
         last_price.set_text(U"  Last Price" | ox::Trait::Bold);
         last_price | fixed_width(14);
         percent_change.set_text(U"Change    " | ox::Trait::Bold);
@@ -334,52 +394,104 @@ class Column_labels : public ox::HArray<ox::HLabel, 7> {
     }
 };
 
-class App_space
-    : public ox::HPair<ox::VTuple<Column_labels, Line, Ticker_list, ox::Widget>,
-                       ox::VScrollbar> {
+class Status_bar : public ox::HTuple<ox::Widget, ox::Tile, ox::HLabel> {
+   private:
+    ox::Widget& arrow     = this->get<0>();
+    ox::Tile& buffer      = this->get<1>();
+    ox::HLabel& text_area = this->get<2>();
+
    public:
-    ox::VScrollbar& scrollbar = this->second;
-    Ticker_list& ticker_list  = this->first.get<2>();
-    ox::Widget& buffer        = this->first.get<3>();
+    Status_bar()
+    {
+        *this | ox::pipe::fixed_height(1);
+        arrow | ox::pipe::wallpaper(U'├') | ox::pipe::fixed_width(1) |
+            bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        buffer | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        text_area.set_text(U"Status");
+        text_area | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+    }
+};
+
+class App_space
+    : public ox::HTuple<
+          Coin_drawer,
+          ox::VTuple<Column_labels, Line, Ticker_list, ox::Widget, Status_bar>,
+          ox::VScrollbar> {
+   public:
+    Coin_drawer& coin_drawer  = this->get<0>();
+    Ticker_list& ticker_list  = this->get<1>().get<2>();
+    ox::Widget& buffer        = this->get<1>().get<3>();
+    Status_bar& status_bar    = this->get<1>().get<4>();
+    ox::VScrollbar& scrollbar = this->get<2>();
 
    public:
     App_space()
     {
         link(scrollbar, ticker_list);
         buffer.install_event_filter(scrollbar);
+        coin_drawer.coin_listings.coinbase_listings.currency_list
+            .add_currencies(ticker_list.available_currencies());
+        coin_drawer.currency_selected.connect(
+            [this](Currency_pair const& currency) {
+                ticker_list.add_ticker(currency);
+            });
     }
 };
 
-class Status_bar : public ox::HLabel {
-   public:
-    Status_bar()
-    {
-        this->set_text(U"Status");
-        *this | bg(ox::Color::Foreground) | fg(ox::Color::Background);
-    }
-};
-
-class Crabwise : public ox::VTuple<ox::Titlebar, App_space, Status_bar> {
+class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
    public:
     ox::Titlebar& titlebar = this->get<0>();
     App_space& app_space   = this->get<1>();
-    Status_bar& status_bar = this->get<2>();
 
    public:
-    Crabwise()
+    /// Reads \p init_filename and adds currencies.
+    Crabwise(std::string const& init_filename)
     {
         titlebar.title.set_text(U"CrabWise");
         ox::Terminal::set_palette(ox::en4::palette);
-        app_space.ticker_list.add_ticker({"BTC", "USD"});
-        app_space.ticker_list.add_ticker({"ALGO", "USD"});
-        app_space.ticker_list.add_ticker({"XLM", "USD"});
-        app_space.ticker_list.add_ticker({"ETH", "USD"});
-        app_space.ticker_list.add_ticker({"NU", "USD"});
-        app_space.ticker_list.add_ticker({"COMP", "USD"});
-        app_space.ticker_list.add_ticker({"MKR", "USD"});
-        app_space.ticker_list.add_ticker({"CGLD", "USD"});
-        app_space.ticker_list.add_ticker({"GRT", "USD"});
-        app_space.ticker_list.add_ticker({"AAVE", "USD"});
+        auto const init_currencies = parse_init_file(init_filename);
+        for (auto const& cp : init_currencies)
+            app_space.ticker_list.add_ticker(cp);
+        if (init_currencies.empty())
+            app_space.ticker_list.add_ticker({"BTC", "USD"});
+    }
+
+   private:
+    /// Return nullopt if not a Currency pair
+    [[nodiscard]] static auto parse_line(std::string const& line)
+        -> std::optional<Currency_pair>
+    {
+        auto ss    = std::istringstream{line};
+        auto base  = std::string{};
+        auto quote = std::string{};
+        if (!ss)
+            throw Crab_error{"Invalid currency pair in file"};
+        ss >> base;
+        if (!base.empty()) {
+            if (base[base.size() - 1] == ':' || base.front() == '#')
+                return std::nullopt;
+        }
+        if (!ss)
+            throw Crab_error{"Invalid currency pair in file"};
+        ss >> quote;
+        return Currency_pair{base, quote};
+    }
+
+    // Market:
+    //     Base Quote
+    // # Comment
+    [[nodiscard]] static auto parse_init_file(std::string const& filename)
+        -> std::vector<Currency_pair>
+    {
+        auto result = std::vector<Currency_pair>{};
+        auto file   = std::ifstream{filename};
+        auto line   = std::string{};
+        while (std::getline(file, line, '\n')) {
+            auto const currency = parse_line(line);
+            if (currency.has_value())
+                result.push_back(*currency);
+        }
+        return result;
     }
 };
 

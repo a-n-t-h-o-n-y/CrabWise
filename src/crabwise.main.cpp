@@ -1,8 +1,12 @@
 #include <termox/termox.hpp>
 
 #include "crabwise.hpp"
+#include "termox/terminal/terminal.hpp"
 
-int main() { return ox::System{}.run<crab::Crabwise>(); }
+int main()
+{
+    return ox::System{ox::Mouse_mode::Drag}.run<crab::Crabwise>("defaults.txt");
+}
 
 // namespace crab {
 

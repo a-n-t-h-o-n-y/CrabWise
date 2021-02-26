@@ -30,7 +30,8 @@ class Coinbase {
    public:
     /// Return list of supported currency pairs.
     /** Makes html request if not initialized yet. */
-    [[nodiscard]] auto currency_pairs() -> std::vector<Currency_pair> const&
+    [[nodiscard]] auto currency_pairs() const
+        -> std::vector<Currency_pair> const&
     {
         if (currency_pairs_.empty())
             currency_pairs_ = this->request_currency_pairs();
@@ -67,12 +68,13 @@ class Coinbase {
 
    private:
     Websocket ws_;
-    std::vector<Currency_pair> currency_pairs_;
-    HTTPS_socket https_socket_;
+    mutable std::vector<Currency_pair> currency_pairs_;
+    mutable HTTPS_socket https_socket_;
 
    private:
     /// use https socket to get currency_pairs_.
-    [[nodiscard]] auto request_currency_pairs() -> std::vector<Currency_pair>;
+    [[nodiscard]] auto request_currency_pairs() const
+        -> std::vector<Currency_pair>;
 };
 
 }  // namespace crab

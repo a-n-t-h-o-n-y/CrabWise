@@ -129,7 +129,7 @@ auto parse(std::string const& json) -> std::optional<crab::Price>
 
 namespace crab {
 
-[[nodiscard]] auto Coinbase::request_currency_pairs()
+[[nodiscard]] auto Coinbase::request_currency_pairs() const
     -> std::vector<Currency_pair>
 {
     auto const message = https_socket_.get("/products");
