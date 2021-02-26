@@ -1,0 +1,72 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # Ubuntu-20 GCC
+  gcc-build-ubuntu20-gcc10:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: recursive
+      - env:
+          CC: gcc-10
+          CXX: g++-10
+        run: |
+          mkdir build && cd build
+          cmake .. && make crabwise
+
+  # Ubuntu-20 Clang
+  clang-build-ubuntu20-clang10:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: recursive
+      - env:
+          CC: clang-10
+          CXX: clang++-10
+        run: |
+          brew install boost
+          mkdir build && cd build
+          cmake .. && make crabwise
+
+  # MacOS-10.15 Clang
+  clang-build-MacOS10-clang12:
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: recursive
+      - env:
+          CC: clang
+          CXX: clang++
+        run: |
+          brew install boost
+          mkdir build && cd build
+          cmake .. && make crabwise
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: "MacOS 10.15 Build"
+          files: |
+              src/crabwise
+
+  # MacOS-10.15 GCC
+  clang-build-MacOS10-gcc10:
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2.3.1
+        with:
+          submodules: recursive
+      - env:
+          CC: gcc-10
+          CXX: g++-10
+        run: |
+          mkdir build && cd build
+          cmake .. && make crabwise
