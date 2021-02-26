@@ -23,7 +23,7 @@
 namespace {
 using namespace crab;
 
-using Socket_t = boost::beast::websocket::stream<Socket_t>;
+using Socket_t = boost::beast::websocket::stream<SSL_socket_t>;
 
 /// Connect the lowest layer socket to \p host, \p port.
 /** throws Crab_error if fails. */
@@ -83,7 +83,7 @@ void Websocket::disconnect()
             "is expected."};
     }
     // Replace socket with new socket. Clean disconnect is impossible.
-    socket_ = std::make_unique<Socket_t>(io_context(), ssl_ctx_);
+    socket_    = std::make_unique<Socket_t>(io_context(), ssl_ctx_);
     connected_ = false;
 }
 

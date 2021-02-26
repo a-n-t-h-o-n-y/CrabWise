@@ -25,7 +25,7 @@ void HTTPS_socket::connect(std::string const& host)
     if (socket_ != nullptr)
         throw Crab_error{"HTTPS_socket::connect: socket_ is null."};
 
-    auto temp_sock = std::make_unique<Socket_t>(io_context(), ssl_ctx_);
+    auto temp_sock = std::make_unique<SSL_socket_t>(io_context(), ssl_ctx_);
 
     if (!SSL_set_tlsext_host_name(temp_sock->native_handle(), host.c_str()))
         throw Crab_error{"HTTPS_socket::connect: set_tlsext failed."};

@@ -13,10 +13,10 @@
 
 namespace crab {
 
-using Context_t = boost::asio::ssl::context;
-using Socket_t  = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
+using Context_t    = boost::asio::ssl::context;
+using SSL_socket_t = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
 
-inline auto set_hostname(Socket_t& socket, std::string const& host) -> bool
+inline auto set_hostname(SSL_socket_t& socket, std::string const& host) -> bool
 {
     return SSL_set_tlsext_host_name(socket.native_handle(), host.c_str());
 }
@@ -33,7 +33,7 @@ inline auto make_context() -> Context_t
 
 /// Perform SSL handshake as client.
 /** throws Crab_error on failure. */
-inline void handshake(Socket_t& socket)
+inline void handshake(SSL_socket_t& socket)
 {
     try {
         socket.handshake(boost::asio::ssl::stream_base::client);

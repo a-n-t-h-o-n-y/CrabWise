@@ -38,7 +38,7 @@ class HTTPS_socket {
    private:
     Context_t ssl_ctx_{make_context()};
 
-    std::unique_ptr<Socket_t> socket_{nullptr};
+    std::unique_ptr<SSL_socket_t> socket_{nullptr};
 
     boost::beast::flat_buffer buffer_;
     std::string host_;

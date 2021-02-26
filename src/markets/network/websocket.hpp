@@ -37,7 +37,7 @@ class Websocket {
    private:
     Context_t ssl_ctx_ = make_context();
 
-    using Socket_t = boost::beast::websocket::stream<Socket_t>;
+    using Socket_t = boost::beast::websocket::stream<SSL_socket_t>;
     std::unique_ptr<Socket_t> socket_ =
         std::make_unique<Socket_t>(io_context(), ssl_ctx_);
 
