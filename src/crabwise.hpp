@@ -73,7 +73,7 @@ class Percent_display : public ox::HArray<ox::HLabel, 2> {
         value | align_right();
         symbol | fixed_width(3) | ox::Trait::Dim | align_center();
         symbol.set_text(U"%");
-        *this | fixed_width(23);
+        *this | fixed_width(18);
     }
 
    public:
@@ -117,29 +117,35 @@ class Remove_btn : public ox::Button {
 };
 
 class Listings : public ox::HTuple<Hamburger,
-                                   ox::Tile,
+                                   ox::Widget,
                                    Div,
                                    Name,
                                    Indicator,
                                    Price_display,
                                    Percent_display,
+                                   ox::Widget,
                                    Price_display,
                                    Remove_btn> {
    public:
     Hamburger& hamburger            = this->get<0>();
+    ox::Widget& buffer_1            = this->get<1>();
     Div& div                        = this->get<2>();
     Name& name                      = this->get<3>();
     Indicator& indicator            = this->get<4>();
     Price_display& last_price       = this->get<5>();
     Percent_display& percent_change = this->get<6>();
-    Price_display& opening_price    = this->get<7>();
-    Remove_btn& remove_btn          = this->get<8>();
+    ox::Widget& buffer_2            = this->get<7>();
+    Price_display& opening_price    = this->get<8>();
+    Remove_btn& remove_btn          = this->get<9>();
 
    public:
     Listings()
     {
-        *this | ox::pipe::fixed_height(1);
-        last_price | ox::pipe::fixed_width(14);
+        using namespace ox::pipe;
+        *this | fixed_height(1);
+        last_price | fixed_width(14);
+        buffer_1 | fixed_width(1);
+        buffer_2 | fixed_width(4);
     }
 };
 
@@ -167,6 +173,8 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
    public:
     Listings& listings = this->first;
     Divider& divider   = this->second;
+
+    sl::Signal<void()>& remove_me = listings.remove_btn.remove_me;
 
    public:
     Ticker(Currency_pair currency,
@@ -238,17 +246,26 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    public:
     void add_ticker(Currency_pair currency)
     {
-        this->make_child(currency, coinbase_.current_price(currency).value,
-                         coinbase_.opening_price(currency).value);
+        if (this->find_ticker(currency) != nullptr)
+            return;
+        auto& child =
+            this->make_child(currency, coinbase_.current_price(currency).value,
+                             coinbase_.opening_price(currency).value);
+        child.remove_me.connect(
+            [this, cp = child.currency_pair()] { this->remove_ticker(cp); });
     }
 
-    // void remove_ticker(Currency_pair currency);
+    void remove_ticker(Currency_pair currency)
+    {
+        auto const at = this->find_ticker(currency);
+        if (at == nullptr)
+            return;
+        this->remove_and_delete_child(at);
+    }
 
     void update_ticker(Price price)
     {
-        auto const at = this->find_child_if([&](Ticker& child) {
-            return child.currency_pair() == price.currency;
-        });
+        auto const at = this->find_ticker(price.currency);
         if (at == nullptr)
             return;
         at->update_last_price(price.value);
@@ -279,6 +296,13 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         for (Currency_pair const& c : pairs)
             coinbase_.subscribe(c);
     }
+
+    /// Return pointer to Ticker if currency matches, nullptr if can't find.
+    [[nodiscard]] auto find_ticker(Currency_pair const& currency) -> Ticker*
+    {
+        return this->find_child_if(
+            [&](Ticker& child) { return child.currency_pair() == currency; });
+    }
 };
 
 class Column_labels : public ox::HArray<ox::HLabel, 7> {
@@ -288,8 +312,8 @@ class Column_labels : public ox::HArray<ox::HLabel, 7> {
     ox::HLabel& buffer_2       = this->get<2>();
     ox::HLabel& last_price     = this->get<3>();
     ox::HLabel& percent_change = this->get<4>();
-    ox::HLabel& opening_price  = this->get<5>();
-    ox::HLabel& buffer_3       = this->get<6>();
+    ox::HLabel& buffer_3       = this->get<5>();
+    ox::HLabel& opening_price  = this->get<6>();
 
    public:
     Column_labels()
@@ -300,13 +324,13 @@ class Column_labels : public ox::HArray<ox::HLabel, 7> {
         name | fixed_width(16);
         last_price.set_text(U"  Last Price" | ox::Trait::Bold);
         last_price | fixed_width(14);
-        percent_change.set_text(U" Change" | ox::Trait::Bold);
-        percent_change | align_center() | fixed_width(23);
+        percent_change.set_text(U"Change    " | ox::Trait::Bold);
+        percent_change | align_right() | fixed_width(18);
         opening_price.set_text(U"  Opening Price" | ox::Trait::Bold);
 
         buffer_1 | fixed_width(5);
         buffer_2 | fixed_width(3);
-        buffer_3 | fixed_width(3);
+        buffer_3 | fixed_width(4);
     }
 };
 
