@@ -48,7 +48,7 @@ jobs:
         run: |
           brew install boost
           mkdir build && cd build
-          cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DOPENSSL_LIBRARIES=/usr/local/opt/openssl/lib .. && make crabwise
+          cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DOPENSSL_LIBRARIES=/usr/local/opt/openssl/lib -DCMAKE_BUILD_TYPE=Release .. && make crabwise
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -60,7 +60,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./build/src/crabwise
           asset_name: crabwise
-          tag: ${{ github.ref }}
+          tag: "latest"
           overwrite: true
 
   # MacOS-10.15 GCC
