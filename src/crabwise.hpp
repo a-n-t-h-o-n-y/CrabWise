@@ -1,5 +1,6 @@
 #ifndef CRAB_CRABWISE_HPP
 #define CRAB_CRABWISE_HPP
+#include <cctype>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -217,7 +218,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         listings.name.set_base(currency.base);
         listings.name.set_quote(currency.quote);
         currency_pair_ = currency;
-        this->update_last_price(last_price);
+
+        listings.last_price.set_price(last_price);
+        this->recalculate_percent_change();
+        last_price_ = std::stod(last_price);
+
         this->update_opening_price(opening_price);
     }
 
@@ -274,7 +279,12 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         this->subscribe_to_all();
     }
 
-    ~Ticker_list() { coinbase_.disconnect_https(); }
+    ~Ticker_list()
+    {
+        coinbase_.disconnect_https();
+        coinbase_loop_.exit(0);
+        coinbase_loop_.wait();
+    }
 
    public:
     void add_ticker(Currency_pair currency)
@@ -457,6 +467,14 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     }
 
    private:
+    /// std::to_upper() each letter, returns ref to passed in modified string.
+    [[nodiscard]] static auto upper(std::string& x) -> std::string&
+    {
+        for (char& c : x)
+            c = std::toupper(c);
+        return x;
+    }
+
     /// Return nullopt if not a Currency pair
     [[nodiscard]] static auto parse_line(std::string const& line)
         -> std::optional<Currency_pair>
@@ -474,7 +492,7 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         if (!ss)
             throw Crab_error{"Invalid currency pair in file"};
         ss >> quote;
-        return Currency_pair{base, quote};
+        return Currency_pair{upper(base), upper(quote)};
     }
 
     // Market:
