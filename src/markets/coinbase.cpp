@@ -1,5 +1,6 @@
 #include "coinbase.hpp"
 
+#include <algorithm>
 #include <iterator>
 #include <optional>
 #include <sstream>
@@ -11,9 +12,9 @@
 #include <boost/property_tree/ptree.hpp>
 
 #include "error.hpp"
-#include "network/https_socket.hpp"
+#include "network/check_response.hpp"
+#include "network/to_ptree.hpp"
 #include "network/url_encode.hpp"
-#include "previous_utc_midnight.hpp"
 #include "to_iso8601.hpp"
 
 namespace {
@@ -78,7 +79,8 @@ auto parse_trade(ptree const& tree) -> crab::Price
 {
     try {
         return {extract_price(tree),
-                {extract_base_currency(tree), extract_quote_currency(tree)}};
+                {"COINBASE",
+                 {extract_base_currency(tree), extract_quote_currency(tree)}}};
     }
     catch (std::exception const& e) {
         throw crab::Crab_error{"coinbase.cpp anon::parse_trade(): " +
@@ -129,73 +131,7 @@ auto parse(std::string const& json) -> std::optional<crab::Price>
 
 namespace crab {
 
-[[nodiscard]] auto Coinbase::request_currency_pairs() const
-    -> std::vector<Currency_pair>
-{
-    auto const message = https_socket_.get("/products");
-    if (message.code != 200)
-        throw Crab_error{"Coinbase: Failed to read currency pairs."};
-    auto tree = ptree{};
-    {
-        auto ss = std::stringstream{message.body};
-        read_json(ss, tree);
-    }
-    auto result = std::vector<Currency_pair>{};
-    for (auto const& product : tree) {
-        auto const id = product.second.get<std::string>("id");
-        result.push_back({parse_base_currency(id), parse_quote_currency(id)});
-    }
-    return result;
-}
-
-auto Coinbase::price_at(Currency_pair currency, std::string const& at) -> Price
-{
-    auto const endpoint = "/products/" + to_id(currency) +
-                          "/candles"
-                          "?start=" +
-                          at + "&end=" + at + "&granularity=3600";
-    auto const message = https_socket_.get(endpoint);
-    if (message.code != 200)
-        throw Crab_error{"Coinbase: Failed to read price at given time."};
-    auto tree = ptree{};
-    {
-        auto ss = std::stringstream{message.body};
-        read_json(ss, tree);
-    }
-    assert(tree.size() == 1);
-    auto product = tree.front().second;
-    assert(product.size() >= 4);
-    auto begin = std::begin(product);
-    std::advance(begin, 3);
-    return {begin->second.get<std::string>(""), currency};
-}
-
-auto Coinbase::price_at(Currency_pair currency, Candle::Time_point_t at)
-    -> Price
-{
-    return this->price_at(currency, to_iso8601(at));
-}
-
-auto Coinbase::current_price(Currency_pair currency) -> Price
-{
-    auto const endpoint = "/products/" + to_id(currency) + "/ticker";
-    auto const message  = https_socket_.get(endpoint);
-    if (message.code != 200)
-        throw Crab_error{"Coinbase: Failed to read current price."};
-    auto tree = ptree{};
-    {
-        auto ss = std::stringstream{message.body};
-        read_json(ss, tree);
-    }
-    return {tree.get<std::string>("price"), currency};
-}
-
-auto Coinbase::opening_price(Currency_pair currency) -> Price
-{
-    return this->price_at(currency, previous_utc_midnight());
-}
-
-void Coinbase::subscribe(Currency_pair currency)
+void Coinbase::subscribe(Asset const& asset)
 {
     using ptree = boost::property_tree::ptree;
 
@@ -203,7 +139,7 @@ void Coinbase::subscribe(Currency_pair currency)
     tree.add("type", "subscribe");
 
     auto pairs = ptree{};
-    push_back(pairs, to_id(currency));
+    push_back(pairs, to_id(asset.currency));
     tree.push_back(std::make_pair("product_ids", pairs));
 
     auto channels = ptree{};
@@ -216,9 +152,34 @@ void Coinbase::subscribe(Currency_pair currency)
     if (!ws_.is_connected())
         ws_.connect("ws-feed.pro.coinbase.com");
     ws_.write(ss.str());
+    ++subscription_count_;
 }
 
-auto Coinbase::read() -> Price
+void Coinbase::unsubscribe(Asset const& asset)
+{
+    using ptree = boost::property_tree::ptree;
+
+    auto tree = ptree{};
+    tree.add("type", "unsubscribe");
+
+    auto pairs = ptree{};
+    push_back(pairs, to_id(asset.currency));
+    tree.push_back(std::make_pair("product_ids", pairs));
+
+    auto channels = ptree{};
+    push_back(channels, "ticker");
+
+    tree.push_back(std::make_pair("channels", channels));
+
+    auto ss = std::ostringstream{};
+    write_json(ss, tree);
+    if (!ws_.is_connected())
+        ws_.connect("ws-feed.pro.coinbase.com");
+    ws_.write(ss.str());
+    --subscription_count_;
+}
+
+auto Coinbase::stream_read() -> Price
 {
     if (!ws_.is_connected())
         ws_.connect("ws-feed.pro.coinbase.com");

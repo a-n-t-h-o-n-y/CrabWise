@@ -55,9 +55,9 @@ jobs:
           automatic_release_tag: "latest"
           prerelease: false
           title: "MacOS 10.15 Build"
-      - uses: svenstaro/upload-release-action@v2
+      - uses: "svenstaro/upload-release-action@v2"
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
           file: ./build/src/crabwise
           asset_name: crabwise
           tag: "latest"

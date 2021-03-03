@@ -14,6 +14,7 @@ class HTTPS_socket {
    public:
     ~HTTPS_socket() { this->disconnect(); }
 
+   public:
     /// Make Connection to \p host. \p host should have 'www.' prefix.
     /** Throws Crab_error if fails. */
     void connect(std::string const& host);
@@ -34,6 +35,13 @@ class HTTPS_socket {
 
     /// Send GET HTTP message to \p resource at endpoint. Return body.
     auto get(std::string const& resource) -> Response;
+
+    /// Return true if the connect() has been called, without disconnect.
+    /** Does not know if the connection is actually still good. */
+    [[nodiscard]] auto is_connected() const -> bool
+    {
+        return socket_ != nullptr;
+    }
 
    private:
     Context_t ssl_ctx_{make_context()};

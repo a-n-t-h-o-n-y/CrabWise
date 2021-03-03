@@ -78,9 +78,7 @@ void Websocket::disconnect()
         socket_->close(boost::beast::websocket::close_code::normal);
     }
     catch (boost::system::system_error const&) {
-        throw Crab_error{
-            "Websocket::disconnect(): close() call threw exception, but this "
-            "is expected."};
+        // Expected to throw, for some reason this is always going to happen.
     }
     // Replace socket with new socket. Clean disconnect is impossible.
     socket_    = std::make_unique<Socket_t>(io_context(), ssl_ctx_);
