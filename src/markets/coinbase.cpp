@@ -3,39 +3,34 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-
-#include <ntwk/check_response.hpp>
-#include <ntwk/url_encode.hpp>
+#include <simdjson.h>
 
 #include "error.hpp"
 
 namespace {
-using ptree = boost::property_tree::ptree;
 
-/// Build ptree array with this.
-void push_back(ptree& array, std::string const& element)
+using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
+
+// Parser specifically for coinbase thread. Make sure you aren't using in
+// multiple threads.
+[[nodiscard]] auto json_parser() -> simdjson::dom::parser&
 {
-    auto x = ptree{};
-    x.put("", element);
-    array.push_back(std::make_pair("", std::move(x)));
+    static auto parser = simdjson::dom::parser{};
+    return parser;
 }
 
-auto extract_error(ptree const& tree) -> std::string
+auto extract_error(JSON_element_t const& e) -> std::string
 {
-    return tree.get<std::string>("message") + ": " +
-           tree.get<std::string>("reason");
+    return (std::string)e["message"] + ": " + (std::string)e["reason"];
 }
 
-auto extract_price(ptree const& tree) -> std::string
+auto extract_price(JSON_element_t const& e) -> std::string
 {
-    return tree.get<std::string>("price");
+    return (std::string)e["price"];
 }
 
 // Split on '-': "XTZ-BTC" extracts "XTZ"
@@ -51,10 +46,9 @@ auto parse_base_currency(std::string const& pair_str) -> std::string
     return {begin, iter};
 }
 
-auto extract_base_currency(ptree const& tree) -> std::string
+auto extract_base_currency(JSON_element_t const& e) -> std::string
 {
-    auto const pair_str = tree.get<std::string>("product_id");
-    return parse_base_currency(pair_str);
+    return parse_base_currency((std::string)e["product_id"]);
 }
 
 // Split on '-'
@@ -68,56 +62,37 @@ auto parse_quote_currency(std::string const& pair_str) -> std::string
     return std::string{iter, end};
 }
 
-auto extract_quote_currency(ptree const& tree) -> std::string
+auto extract_quote_currency(JSON_element_t const& e) -> std::string
 {
-    auto const pair_str = tree.get<std::string>("product_id");
-    return parse_quote_currency(pair_str);
+    return parse_quote_currency((std::string)e["product_id"]);
 }
 
-auto parse_trade(ptree const& tree) -> crab::Price
+auto parse_trade(JSON_element_t const& e) -> std::optional<crab::Price>
 {
     try {
-        return {extract_price(tree),
-                {"COINBASE",
-                 {extract_base_currency(tree), extract_quote_currency(tree)}}};
+        return crab::Price{
+            extract_price(e),
+            {"COINBASE",
+             {extract_base_currency(e), extract_quote_currency(e)}}};
     }
     catch (std::exception const& e) {
-        throw crab::Crab_error{"coinbase.cpp anon::parse_trade(): " +
-                               std::string{e.what()}};
+        assert(false);
+        return std::nullopt;
     }
-}
-
-auto extract_event(ptree const& tree) -> std::string
-{
-    return tree.get<std::string>("type");
 }
 
 // JSON message to Last_price
 auto parse(std::string const& json) -> std::optional<crab::Price>
 {
-    auto tree = ptree{};
-    {
-        auto ss = std::stringstream{json};
-        read_json(ss, tree);
-    }
-
-    auto const event = extract_event(tree);
-    if (event == "ticker") {
-        try {
-            return parse_trade(tree);
-        }
-        catch (crab::Crab_error const&) {
-            return std::nullopt;
-        }
-    }
-    else if (event == "subscriptions")
-        return std::nullopt;
-    else if (event == "error") {
+    auto const element = json_parser().parse(json);
+    auto const event   = (std::string)element["type"];
+    if (event == "ticker")
+        return parse_trade(element);
+    if (event == "error") {
         throw crab::Crab_error{"coinbase.cpp anon::parse(): " +
-                               std::string{extract_error(tree)}};
+                               extract_error(element)};
     }
-    else
-        return std::nullopt;
+    return std::nullopt;
 }
 
 /// Currency_pair to coinbase formatted id: [base]-[quote]
@@ -132,49 +107,23 @@ namespace crab {
 
 void Coinbase::subscribe(Asset const& asset)
 {
-    using ptree = boost::property_tree::ptree;
-
-    auto tree = ptree{};
-    tree.add("type", "subscribe");
-
-    auto pairs = ptree{};
-    push_back(pairs, to_id(asset.currency));
-    tree.push_back(std::make_pair("product_ids", pairs));
-
-    auto channels = ptree{};
-    push_back(channels, "ticker");
-
-    tree.push_back(std::make_pair("channels", channels));
-
-    auto ss = std::ostringstream{};
-    write_json(ss, tree);
     if (!ws_.is_connected())
         ws_.connect("ws-feed.pro.coinbase.com");
-    ws_.write(ss.str());
+    auto const json =
+        std::string{"{\"type\":\"subscribe\",\"product_ids\":[\""} +
+        to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
+    ws_.write(json);
     ++subscription_count_;
 }
 
 void Coinbase::unsubscribe(Asset const& asset)
 {
-    using ptree = boost::property_tree::ptree;
-
-    auto tree = ptree{};
-    tree.add("type", "unsubscribe");
-
-    auto pairs = ptree{};
-    push_back(pairs, to_id(asset.currency));
-    tree.push_back(std::make_pair("product_ids", pairs));
-
-    auto channels = ptree{};
-    push_back(channels, "ticker");
-
-    tree.push_back(std::make_pair("channels", channels));
-
-    auto ss = std::ostringstream{};
-    write_json(ss, tree);
     if (!ws_.is_connected())
         ws_.connect("ws-feed.pro.coinbase.com");
-    ws_.write(ss.str());
+    auto const json =
+        std::string{"{\"type\":\"unsubscribe\",\"product_ids\":[\""} +
+        to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
+    ws_.write(json);
     --subscription_count_;
 }
 
@@ -183,10 +132,9 @@ auto Coinbase::stream_read() -> Price
     if (!ws_.is_connected())
         ws_.connect("ws-feed.pro.coinbase.com");
 
-    auto price = parse(ws_.read());
-    while (!price) {
+    auto price = std::optional<Price>{std::nullopt};
+    while (!price)
         price = parse(ws_.read());
-    }
     return *price;
 }
 

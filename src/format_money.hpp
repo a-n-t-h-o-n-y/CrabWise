@@ -18,12 +18,18 @@ inline void insert_thousands_separators(std::string& value)
 inline void format_decimal_places(std::string& value)
 {
     auto const decimal = value.rfind('.');
-    if (decimal == std::string::npos)
+    if (decimal == std::string::npos) {
         value.append(".00");
-    else {
-        while (value.size() - decimal < 3)
-            value.push_back('0');
+        return;
     }
+
+    // Add Trailing Zeros
+    while ((value.size() - decimal) < 3)
+        value.push_back('0');
+
+    // Remove Trailing Zeros
+    while (value.size() - decimal > 3 && value.back() == '0')
+        value.pop_back();
 }
 
 inline void format_money(std::string& money)

@@ -2,9 +2,7 @@
 #define CRAB_MARKETS_COINBASE_HPP
 #include <ntwk/websocket.hpp>
 
-#include "../candle.hpp"
-#include "../currency_pair.hpp"
-#include "../period.hpp"
+#include "../asset.hpp"
 #include "../price.hpp"
 
 namespace crab {
@@ -28,7 +26,7 @@ class Coinbase {
     }
 
     /// Read a single response from the coinbase server.
-    auto stream_read() -> Price;
+    [[nodiscard]] auto stream_read() -> Price;
 
    private:
     ntwk::Websocket ws_;

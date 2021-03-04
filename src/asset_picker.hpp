@@ -31,7 +31,7 @@ class Search_input
         *this | fixed_height(1);
         button | label(U" Search" | ox::Trait::Bold) | fixed_width(8) |
             bg(crab::Light_gray) | fg(crab::Background);
-        spinner | bg(crab::Gray) | fg(crab::Background);
+        spinner | bg(crab::Gray);
         spinner.start();
         search_field | bg(crab::Gray);
 

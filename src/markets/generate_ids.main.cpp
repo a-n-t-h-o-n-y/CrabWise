@@ -7,11 +7,20 @@
 #include <ntwk/check_response.hpp>
 #include <ntwk/https_socket.hpp>
 
+#include <simdjson.h>
+
 #include "../asset.hpp"
 #include "../currency_pair.hpp"
-#include "to_ptree.hpp"
 
 namespace {
+
+using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
+
+[[nodiscard]] auto json_parser() -> simdjson::dom::parser&
+{
+    static auto parser = simdjson::dom::parser{};
+    return parser;
+}
 
 [[nodiscard]] auto parse_crypto_symbol(std::string const& display_symbol)
     -> crab::Currency_pair
@@ -21,8 +30,8 @@ namespace {
             display_symbol.substr(div_pos + 1)};
 }
 
-[[nodiscard]] auto build_rest_query(std::string const& key,
-                                    std::string resource) -> std::string
+[[nodiscard]] auto build_rest_query(std::string resource,
+                                    std::string const& key) -> std::string
 {
     if (!resource.empty() && (resource.find('?') == std::string::npos))
         resource.push_back('?');
@@ -36,11 +45,11 @@ namespace {
                                       std::string const& key)
     -> std::vector<std::string>
 {
-    auto const message = sock.get(build_rest_query(key, "crypto/exchange"));
+    auto const message = sock.get(build_rest_query("crypto/exchange", key));
     ntwk::check_response(message, "Finnhub - Failed to read crypto exchanges");
     auto result = std::vector<std::string>{};
-    for (auto const& node : crab::to_ptree(message.body))
-        result.push_back(node.second.get<std::string>(""));
+    for (auto const exchange : json_parser().parse(message.body))
+        result.push_back((std::string)exchange);
     return result;
 }
 
@@ -51,16 +60,15 @@ namespace {
     -> std::vector<std::pair<std::string, crab::Asset>>
 {
     auto const message =
-        sock.get(build_rest_query(key, "crypto/symbol?exchange=" + exchange));
+        sock.get(build_rest_query("crypto/symbol?exchange=" + exchange, key));
     ntwk::check_response(
         message, "Finnhub - Failed to read crypto symbols for " + exchange);
     auto result = std::vector<std::pair<std::string, crab::Asset>>{};
-    for (auto const& node : crab::to_ptree(message.body)) {
+    for (auto const& node : json_parser().parse(message.body)) {
         result.push_back(
-            {node.second.get<std::string>("symbol"),
-             crab::Asset{exchange,
-                         parse_crypto_symbol(
-                             node.second.get<std::string>("displaySymbol"))}});
+            {(std::string)node["symbol"],
+             crab::Asset{exchange, parse_crypto_symbol(
+                                       (std::string)node["displaySymbol"])}});
     }
     return result;
 }
@@ -94,8 +102,7 @@ void make_get_asset_line(std::ostream& os,
        << "}}},\n";
 }
 
-/// Query for all symbol_ids from Finnhub and write it out to given cpp
-/// file.
+/// Query for all symbol_ids from Finnhub and write it out to given cpp file.
 void generate_finnhub_symbol_id_tables(ntwk::HTTPS_socket& sock,
                                        std::string const& key,
                                        std::ostream& os)

@@ -115,69 +115,56 @@ class Markets {
     detail::Locking_asset_list finnhub_to_unsubscribe_to_;
 
    private:
-    void launch_finnhub()
+    template <typename Market_t, typename Locking_queue_t>
+    auto generate_loop_fn(Market_t& market,
+                          Locking_queue_t& to_sub,
+                          Locking_queue_t& to_unsub)
     {
-        if (finnhub_loop_.is_running())
-            return;
-        finnhub_loop_.run_async([&](ox::Event_queue& q) {
+        return [this, &market, &to_sub, &to_unsub](ox::Event_queue& q) {
             {  // Subscribe
-                auto const lock = finnhub_to_subscribe_to_.lock();
-                for (auto const& asset : finnhub_to_subscribe_to_)
-                    finnhub_.subscribe(asset);
-                finnhub_to_subscribe_to_.clear();
+                auto const lock = to_sub.lock();
+                for (auto const& asset : to_sub)
+                    market.subscribe(asset);
+                to_sub.clear();
             }
             {  // Unsubscribe
-                auto const lock = finnhub_to_unsubscribe_to_.lock();
-                for (auto const& asset : finnhub_to_unsubscribe_to_)
-                    finnhub_.unsubscribe(asset);
-                finnhub_to_unsubscribe_to_.clear();
+                auto const lock = to_unsub.lock();
+                for (auto const& asset : to_unsub)
+                    market.unsubscribe(asset);
+                to_unsub.clear();
             }
-            if (finnhub_.subscription_count() != 0) {
-                auto const prices = finnhub_.stream_read();
+            if (market.subscription_count() != 0) {
+                auto const prices = market.stream_read();
                 q.append(ox::Custom_event{[this, prices] {
                     auto const lock = std::lock_guard{price_update_mtx_};
-                    for (auto const& p : prices)
-                        this->price_update(p);
+                    if constexpr (std::is_same_v<decltype(prices), const Price>)
+                        this->price_update(prices);
+                    else {
+                        for (auto const& p : prices)
+                            this->price_update(p);
+                    }
                 }});
             }
             else {
                 std::this_thread::sleep_for(std::chrono::milliseconds{100});
             }
-        });
+        };
+    }
+
+    void launch_finnhub()
+    {
+        if (finnhub_loop_.is_running())
+            return;
+        finnhub_loop_.run_async(this->generate_loop_fn(
+            finnhub_, finnhub_to_subscribe_to_, finnhub_to_unsubscribe_to_));
     }
 
     void launch_coinbase()
     {
         if (coinbase_loop_.is_running())
             return;
-        // TODO this could be a template function that returns a lambda, pass in
-        // the coinbase or finnhub object.
-        coinbase_loop_.run_async([&](ox::Event_queue& q) {
-            {  // Subscribe
-                auto const lock = coinbase_to_subscribe_to_.lock();
-                for (auto const& asset : coinbase_to_subscribe_to_)
-                    coinbase_.subscribe(asset);
-                coinbase_to_subscribe_to_.clear();
-            }
-            {  // Unsubscribe
-                auto const lock = coinbase_to_unsubscribe_to_.lock();
-                for (auto const& asset : coinbase_to_unsubscribe_to_)
-                    coinbase_.unsubscribe(asset);
-                coinbase_to_unsubscribe_to_.clear();
-            }
-            if (coinbase_.subscription_count() != 0) {
-                auto const price = coinbase_.stream_read();
-                q.append(ox::Custom_event{[this, price] {
-                    auto const lock = std::lock_guard{price_update_mtx_};
-                    this->price_update(price);
-                    // TODO generic: if constexpr is vector or prices or is
-                    // price, iterate or not.
-                }});
-            }
-            else {
-                std::this_thread::sleep_for(std::chrono::milliseconds{100});
-            }
-        });
+        coinbase_loop_.run_async(this->generate_loop_fn(
+            coinbase_, coinbase_to_subscribe_to_, coinbase_to_unsubscribe_to_));
     }
 };
 

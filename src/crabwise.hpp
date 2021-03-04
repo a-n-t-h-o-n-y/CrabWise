@@ -19,7 +19,6 @@
 #include "palette.hpp"
 #include "search_result.hpp"
 #include "stats.hpp"
-#include "termox/widget/widgets/scrollbar.hpp"
 
 namespace crab {
 
@@ -89,7 +88,6 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
     void set_price(std::string v)
     {
         format_money(v);
-        // offset_decimal(v, 6);
         value.set_text(v);
     }
 
@@ -149,13 +147,6 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
             return U"ȿ";
         return "";
     }
-
-    /// inserts spze to make decision at \p decimal_position.
-    static void offset_decimal(std::string& value, int decimal_position)
-    {
-        auto const decimal = value.rfind('.');
-        value.insert(0, decimal_position - decimal, ' ');
-    }
 };
 
 class Percent_display : public ox::HArray<ox::HLabel, 2> {
@@ -170,7 +161,6 @@ class Percent_display : public ox::HArray<ox::HLabel, 2> {
     }
 
    public:
-    // TODO formatting
     void set_percent(double x) { value.set_text(std::to_string(x)); }
 
    public:
@@ -279,13 +269,13 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
    public:
     Ticker(Asset asset, Stats stats)
-        : asset_{asset}, last_price_{std::stod(stats.current_price)}
+        : asset_{asset}, last_price_{stats.current_price}
     {
         listings.last_price.set_currency(asset.currency.quote);
         listings.opening_price.set_currency(asset.currency.quote);
         listings.name.set(asset);
 
-        listings.last_price.set_price(stats.current_price);
+        listings.last_price.set_price(std::to_string(stats.current_price));
         this->recalculate_percent_change();
 
         this->update_opening_price(stats.opening_price);
@@ -304,10 +294,10 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         last_price_ = newer;
     }
 
-    void update_opening_price(std::string const& value)
+    void update_opening_price(double value)
     {
-        opening_price_ = std::stod(value);
-        listings.opening_price.set_price(value);
+        opening_price_ = value;
+        listings.opening_price.set_price(std::to_string(value));
         this->recalculate_percent_change();
     }
 
