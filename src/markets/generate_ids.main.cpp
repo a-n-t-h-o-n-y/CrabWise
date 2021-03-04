@@ -4,11 +4,12 @@
 #include <utility>
 #include <vector>
 
+#include <ntwk/check_response.hpp>
+#include <ntwk/https_socket.hpp>
+
 #include "../asset.hpp"
 #include "../currency_pair.hpp"
-#include "network/check_response.hpp"
-#include "network/https_socket.hpp"
-#include "network/to_ptree.hpp"
+#include "to_ptree.hpp"
 
 namespace {
 
@@ -31,12 +32,12 @@ namespace {
 }
 
 /// Query for list of crypto exchanges.
-[[nodiscard]] auto get_exchanges_list(crab::HTTPS_socket& sock,
+[[nodiscard]] auto get_exchanges_list(ntwk::HTTPS_socket& sock,
                                       std::string const& key)
     -> std::vector<std::string>
 {
     auto const message = sock.get(build_rest_query(key, "crypto/exchange"));
-    crab::check_response(message, "Finnhub - Failed to read crypto exchanges");
+    ntwk::check_response(message, "Finnhub - Failed to read crypto exchanges");
     auto result = std::vector<std::string>{};
     for (auto const& node : crab::to_ptree(message.body))
         result.push_back(node.second.get<std::string>(""));
@@ -44,14 +45,14 @@ namespace {
 }
 
 /// Return list of pairs of symbol_ids and Assets the given \p exchange has.
-[[nodiscard]] auto exchange_assets(crab::HTTPS_socket& sock,
+[[nodiscard]] auto exchange_assets(ntwk::HTTPS_socket& sock,
                                    std::string const& key,
                                    std::string const& exchange)
     -> std::vector<std::pair<std::string, crab::Asset>>
 {
     auto const message =
         sock.get(build_rest_query(key, "crypto/symbol?exchange=" + exchange));
-    crab::check_response(
+    ntwk::check_response(
         message, "Finnhub - Failed to read crypto symbols for " + exchange);
     auto result = std::vector<std::pair<std::string, crab::Asset>>{};
     for (auto const& node : crab::to_ptree(message.body)) {
@@ -95,7 +96,7 @@ void make_get_asset_line(std::ostream& os,
 
 /// Query for all symbol_ids from Finnhub and write it out to given cpp
 /// file.
-void generate_finnhub_symbol_id_tables(crab::HTTPS_socket& sock,
+void generate_finnhub_symbol_id_tables(ntwk::HTTPS_socket& sock,
                                        std::string const& key,
                                        std::ostream& os)
 {
@@ -127,7 +128,7 @@ int main(int argc, char* argv[])
         return 1;
     }
     auto const key = std::string{argv[1]};
-    auto sock      = crab::HTTPS_socket{};
+    auto sock      = ntwk::HTTPS_socket{};
     sock.connect("finnhub.io");
     generate_finnhub_symbol_id_tables(sock, key, std::cout);
     sock.disconnect();

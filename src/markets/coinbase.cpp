@@ -11,11 +11,10 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include <ntwk/check_response.hpp>
+#include <ntwk/url_encode.hpp>
+
 #include "error.hpp"
-#include "network/check_response.hpp"
-#include "network/to_ptree.hpp"
-#include "network/url_encode.hpp"
-#include "to_iso8601.hpp"
 
 namespace {
 using ptree = boost::property_tree::ptree;
@@ -23,9 +22,9 @@ using ptree = boost::property_tree::ptree;
 /// Build ptree array with this.
 void push_back(ptree& array, std::string const& element)
 {
-    auto foo = ptree{};
-    foo.put("", element);
-    array.push_back(std::make_pair("", std::move(foo)));
+    auto x = ptree{};
+    x.put("", element);
+    array.push_back(std::make_pair("", std::move(x)));
 }
 
 auto extract_error(ptree const& tree) -> std::string

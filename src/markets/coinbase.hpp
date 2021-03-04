@@ -1,10 +1,11 @@
 #ifndef CRAB_MARKETS_COINBASE_HPP
 #define CRAB_MARKETS_COINBASE_HPP
+#include <ntwk/websocket.hpp>
+
 #include "../candle.hpp"
 #include "../currency_pair.hpp"
 #include "../period.hpp"
 #include "../price.hpp"
-#include "network/websocket.hpp"
 
 namespace crab {
 
@@ -30,7 +31,7 @@ class Coinbase {
     auto stream_read() -> Price;
 
    private:
-    Websocket ws_;
+    ntwk::Websocket ws_;
     int subscription_count_ = 0;
 };
 

@@ -8,16 +8,17 @@
 
 #include <boost/property_tree/ptree.hpp>
 
+#include <ntwk/check_response.hpp>
+#include <ntwk/https_socket.hpp>
+#include <ntwk/websocket.hpp>
+
 #include "../asset.hpp"
 #include "../currency_pair.hpp"
 #include "../price.hpp"
 #include "../search_result.hpp"
 #include "../stats.hpp"
 #include "error.hpp"
-#include "network/check_response.hpp"
-#include "network/https_socket.hpp"
-#include "network/to_ptree.hpp"
-#include "network/websocket.hpp"
+#include "to_ptree.hpp"
 
 namespace crab {
 
@@ -135,9 +136,8 @@ class Finnhub {
     }
 
    private:
-    Websocket ws_;
-    mutable std::vector<Currency_pair> currency_pairs_;
-    mutable HTTPS_socket https_socket_;
+    ntwk::Websocket ws_;
+    mutable ntwk::HTTPS_socket https_socket_;
     std::string key_param_;
     int subscription_count_ = 0;
 
