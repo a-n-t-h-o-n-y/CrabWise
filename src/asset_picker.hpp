@@ -8,8 +8,11 @@
 #include "palette.hpp"
 #include "search_result.hpp"
 #include "termox/widget/pipe.hpp"
+#include "termox/widget/widgets/accordion.hpp"
 #include "termox/widget/widgets/scrollbar.hpp"
 #include "termox/widget/widgets/spinner.hpp"
+#include "termox/widget/widgets/text_display.hpp"
+#include "termox/widget/widgets/textbox.hpp"
 
 namespace crab {
 
@@ -167,16 +170,53 @@ class Search_results : public ox::VPair<Search_results_groups, ox::Widget> {
     void clear_results() { groups.clear_results(); }
 };
 
-class Asset_picker
-    : public ox::HAccordion<ox::VPair<Search_input, Search_results>,
-                            ox::Bar_position::Last> {
+class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
    private:
-    using Base_t = ox::HAccordion<ox::VPair<Search_input, Search_results>,
-                                  ox::Bar_position::Last>;
+    using Base_t = ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>>;
 
    public:
-    Search_input& search_input     = this->wrapped().first;
-    Search_results& search_results = this->wrapped().second;
+    ox::VScrollbar& scrollbar = this->wrapped().first;
+    ox::Textbox& textbox      = this->wrapped().second;
+
+   public:
+    Info_box() : Base_t{{U"About 🦀", ox::Align::Center}}
+    {
+        link(scrollbar, textbox);
+
+        this->wrapped() | ox::pipe::fixed_height(8);
+
+        textbox.disable_input();
+        textbox | ox::pipe::no_focus();
+        add_info(textbox);
+    }
+
+   private:
+    static void add_info(ox::Textbox& tb)
+    {
+        auto info = ox::Glyph_string{
+            U"This is an information box with some information within it, some "
+            U"things can be "};
+        info.append(U"bold" | ox::Trait::Bold);
+        info.append(U", and some things are ");
+        info.append(U"colorful" | fg(crab::Red));
+
+        tb.clear();
+        tb.set_contents(info);
+    }
+};
+
+class Asset_picker
+    : public ox::HAccordion<ox::VTuple<Search_input, Search_results, Info_box>,
+                            ox::Bar_position::Last> {
+   private:
+    using Base_t =
+        ox::HAccordion<ox::VTuple<Search_input, Search_results, Info_box>,
+                       ox::Bar_position::Last>;
+
+   public:
+    Search_input& search_input     = this->wrapped().get<0>();
+    Search_results& search_results = this->wrapped().get<1>();
+    Info_box& info_box             = this->wrapped().get<2>();
 
    public:
     Asset_picker() : Base_t{{U"Stonk Selector", ox::Align::Center}}

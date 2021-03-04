@@ -2,6 +2,9 @@
 #define CRAB_MARKETS_MARKETS_HPP
 #include <mutex>
 #include <string>
+#include <thread>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <signals_light/signal.hpp>
@@ -11,29 +14,49 @@
 #include "../stats.hpp"
 #include "coinbase.hpp"
 #include "finnhub.hpp"
+#include "termox/system/event.hpp"
 
 namespace crab::detail {
-/// List of assets to subscribe to with mutex lock.
-class Locking_asset_list {
+
+/// List of values with mutex lock.
+template <typename T>
+class Locking_list {
    public:
     auto lock() { return std::lock_guard{mtx_}; }
 
    public:
-    void push_back(Asset asset) { assets_.push_back(std::move(asset)); }
+    void push_back(T value) { values_.push_back(std::move(value)); }
 
-    void clear() { assets_.clear(); }
+    void clear() { values_.clear(); }
 
    public:
-    auto begin() const { return std::begin(assets_); }
+    auto begin() const { return std::cbegin(values_); }
 
-    auto end() const { return std::end(assets_); }
+    auto begin() { return std::begin(values_); }
 
-    auto size() const { return assets_.size(); }
+    auto end() const { return std::cend(values_); }
+
+    auto end() { return std::end(values_); }
+
+    auto front() const { return values_.front(); }
+
+    auto front() { return values_.front(); }
+
+    auto back() const { return values_.back(); }
+
+    auto back() { return values_.back(); }
+
+    auto size() const { return values_.size(); }
+
+    auto empty() const { return values_.empty(); }
 
    private:
-    std::vector<Asset> assets_;
+    std::vector<T> values_;
     std::mutex mtx_;
 };
+
+using Locking_asset_list  = Locking_list<Asset>;
+using Locking_string_list = Locking_list<std::string>;
 
 }  // namespace crab::detail
 
@@ -43,6 +66,8 @@ namespace crab {
 class Markets {
    public:
     sl::Signal<void(Price const&)> price_update;
+    sl::Signal<void(Asset const&, Stats const&)> stats_received;
+    sl::Signal<void(std::vector<Search_result> const&)> search_results_received;
 
    private:
     std::mutex price_update_mtx_;  // locked when emitting
@@ -60,19 +85,22 @@ class Markets {
         coinbase_.disconnect_websocket();
     }
 
-    [[nodiscard]] auto stats(Asset const& asset) -> Stats
+    void request_stats(Asset const& asset)
     {
-        return finnhub_.stats(asset);
+        auto const lock = stats_requested_.lock();
+        stats_requested_.push_back(asset);
     }
 
-    [[nodiscard]] auto search(std::string const& query)
-        -> std::vector<Search_result>
+    void request_search(std::string const& query)
     {
-        return finnhub_.search(query);
+        auto const lock = search_requested_.lock();
+        search_requested_.push_back(query);
     }
 
     void launch_streams()
     {
+        this->launch_stats_loop();
+        this->launch_search_loop();
         this->launch_finnhub();
         this->launch_coinbase();
     }
@@ -114,6 +142,15 @@ class Markets {
     detail::Locking_asset_list finnhub_to_subscribe_to_;
     detail::Locking_asset_list finnhub_to_unsubscribe_to_;
 
+    detail::Locking_asset_list stats_requested_;
+    ox::Event_loop stats_loop_;
+
+    detail::Locking_string_list search_requested_;
+    ox::Event_loop search_loop_;
+
+    // search and stats both use the finnhub https socket.
+    std::mutex https_socket_mtx_;
+
    private:
     template <typename Market_t, typename Locking_queue_t>
     auto generate_loop_fn(Market_t& market,
@@ -133,7 +170,9 @@ class Markets {
                     market.unsubscribe(asset);
                 to_unsub.clear();
             }
-            if (market.subscription_count() != 0) {
+            if (market.subscription_count() == 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds{100});
+            else {
                 auto const prices = market.stream_read();
                 q.append(ox::Custom_event{[this, prices] {
                     auto const lock = std::lock_guard{price_update_mtx_};
@@ -144,9 +183,6 @@ class Markets {
                             this->price_update(p);
                     }
                 }});
-            }
-            else {
-                std::this_thread::sleep_for(std::chrono::milliseconds{100});
             }
         };
     }
@@ -165,6 +201,70 @@ class Markets {
             return;
         coinbase_loop_.run_async(this->generate_loop_fn(
             coinbase_, coinbase_to_subscribe_to_, coinbase_to_unsubscribe_to_));
+    }
+
+    void launch_stats_loop()
+    {
+        if (stats_loop_.is_running())
+            return;
+        stats_loop_.run_async([this](ox::Event_queue& q) {
+            {
+                auto stats_requested_copy = std::vector<Asset>{};
+                {  // Make a copy, b/c making requests here holds up the lock.
+                    auto const lock = stats_requested_.lock();
+                    for (Asset& a : stats_requested_)
+                        stats_requested_copy.push_back(std::move(a));
+                    stats_requested_.clear();
+                }
+                if (stats_requested_copy.empty())
+                    std::this_thread::sleep_for(std::chrono::milliseconds{300});
+                else {
+                    auto results = std::vector<std::pair<Asset, Stats>>{};
+                    for (Asset const& a : stats_requested_copy)
+                        results.push_back({a, this->stats(a)});
+                    q.append(ox::Custom_event{[results, this] {
+                        for (auto const& [asset, stats] : results)
+                            this->stats_received.emit(asset, stats);
+                    }});
+                }
+            }
+        });
+    }
+
+    void launch_search_loop()
+    {
+        if (search_loop_.is_running())
+            return;
+        search_loop_.run_async([this](ox::Event_queue& q) {
+            auto last_request = std::string{};  // Only search the last request.
+            {  // Make a copy, b/c making requests here holds up the lock.
+                auto const lock = search_requested_.lock();
+                if (!search_requested_.empty())
+                    last_request = search_requested_.back();
+                search_requested_.clear();
+            }
+            if (last_request.empty())
+                std::this_thread::sleep_for(std::chrono::milliseconds{300});
+            else {
+                auto results = this->search(last_request);
+                q.append(ox::Custom_event{[results, this] {
+                    this->search_results_received.emit(results);
+                }});
+            }
+        });
+    }
+
+    [[nodiscard]] auto stats(Asset const& asset) -> Stats
+    {
+        auto const lock = std::lock_guard{https_socket_mtx_};
+        return finnhub_.stats(asset);
+    }
+
+    [[nodiscard]] auto search(std::string const& query)
+        -> std::vector<Search_result>
+    {
+        auto const lock = std::lock_guard{https_socket_mtx_};
+        return finnhub_.search(query);
     }
 };
 

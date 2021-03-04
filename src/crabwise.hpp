@@ -9,7 +9,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
-#include <thread>
+#include <vector>
 
 #include <termox/termox.hpp>
 
@@ -329,6 +329,10 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     {
         markets_.price_update.connect(
             [this](Price const& p) { this->update_ticker(p); });
+        markets_.stats_received.connect(
+            [this](Asset const& asset, Stats const& stats) {
+                this->init_ticker(asset, stats);
+            });
     }
 
     ~Ticker_list() { markets_.shutdown(); }
@@ -339,7 +343,8 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         if (this->find_ticker(asset) != nullptr)
             return;  // Already Added
         markets_.subscribe(asset);
-        auto& child = this->make_child(asset, markets_.stats(asset));
+        markets_.request_stats(asset);
+        auto& child = this->make_child(asset, Stats{0., 0.});
         child.remove_me.connect(
             [this, asset = child.asset()] { this->remove_ticker(asset); });
         child.listings.hamburger.pressed.connect(
@@ -366,11 +371,23 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         at->update_last_price(price.value);
     }
 
-    /// Return list of all Assets that can be added as Tickers.
-    [[nodiscard]] auto search(std::string const& query)
-        -> std::vector<Search_result>
+    /// Set initial price and opening price of the given asset.
+    /** No-op if asset is not in the ticker list. */
+    void init_ticker(Asset const& asset, Stats const& stats)
     {
-        return markets_.search(query);
+        auto const at = this->find_ticker(asset);
+        if (at == nullptr)
+            return;
+        at->update_last_price(std::to_string(stats.current_price));
+        at->update_opening_price(stats.opening_price);
+    }
+
+    /// Return list of all Assets that can be added as Tickers.
+    /// Make request for async https request for Search_results.
+    /** markets_.search_results_recieved emitted when finished. */
+    [[nodiscard]] auto request_search(std::string const& query)
+    {
+        markets_.request_search(query);
     }
 
    protected:
@@ -406,6 +423,10 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         return this->find_child_if(
             [&](Ticker& child) { return child.asset() == asset; });
     }
+
+   public:
+    sl::Signal<void(std::vector<Search_result> const&)>&
+        search_results_received = markets_.search_results_received;
 };
 
 class Column_labels : public ox::HArray<ox::HLabel, 7> {
@@ -483,7 +504,13 @@ class App_space
         asset_picker.search_input.search_request.connect(
             [this](std::string const& s) {
                 asset_picker.search_results.clear_results();
-                for (auto const& search_result : this->ticker_list.search(s))
+                this->ticker_list.request_search(s);
+            });
+
+        ticker_list.search_results_received.connect(
+            [this](std::vector<Search_result> const& results) {
+                asset_picker.search_results.clear_results();
+                for (auto const& search_result : results)
                     asset_picker.search_results.add_result(search_result);
             });
     }
@@ -503,8 +530,6 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         auto const init_assets = parse_init_file(init_filename);
         for (Asset const& a : init_assets)
             app_space.ticker_list.add_ticker(a);
-        if (init_assets.empty())
-            app_space.ticker_list.add_ticker({"COINBASE", {"BTC", "USD"}});
     }
 
    private:
@@ -551,6 +576,12 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
 
     // Exchange:
     //     Base Quote
+    //     Base Quote
+    //     Base Quote
+    //
+    // Stock:
+    //     Symbol
+    //     Symbol
     // # Comment
     [[nodiscard]] static auto parse_init_file(std::string const& filename)
         -> std::vector<Asset>
