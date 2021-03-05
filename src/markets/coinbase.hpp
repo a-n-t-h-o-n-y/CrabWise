@@ -1,8 +1,12 @@
 #ifndef CRAB_MARKETS_COINBASE_HPP
 #define CRAB_MARKETS_COINBASE_HPP
+#include <exception>
+#include <string>
+
 #include <ntwk/websocket.hpp>
 
 #include "../asset.hpp"
+#include "../log.hpp"
 #include "../price.hpp"
 
 namespace crab {
@@ -31,6 +35,19 @@ class Coinbase {
    private:
     ntwk::Websocket ws_;
     int subscription_count_ = 0;
+
+   private:
+    void ws_connect()
+    {
+        log_status("Websocket connect: ws-feed.pro.coinbase.com");
+        try {
+            ws_.connect("ws-feed.pro.coinbase.com");
+        }
+        catch (std::exception const& e) {
+            log_error("Coinbase Websocket failed to connect: " +
+                      std::string{e.what()});
+        }
+    }
 };
 
 }  // namespace crab

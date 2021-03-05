@@ -221,7 +221,7 @@ class Asset_picker
    public:
     Asset_picker() : Base_t{{U"Stonk Selector", ox::Align::Center}}
     {
-        this->wrapped() | ox::pipe::fixed_width(22);
+        this->wrapped() | ox::pipe::fixed_width(26);
     }
 };
 

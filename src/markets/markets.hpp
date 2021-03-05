@@ -209,6 +209,7 @@ class Markets {
             return;
         stats_loop_.run_async([this](ox::Event_queue& q) {
             {
+                // Make sure to never post events until inside Custom_event
                 auto stats_requested_copy = std::vector<Asset>{};
                 {  // Make a copy, b/c making requests here holds up the lock.
                     auto const lock = stats_requested_.lock();

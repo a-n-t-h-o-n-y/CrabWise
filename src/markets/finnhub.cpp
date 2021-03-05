@@ -9,9 +9,11 @@
 
 #include <ntwk/check_response.hpp>
 #include <ntwk/https_socket.hpp>
+#include <ntwk/url_encode.hpp>
 #include <ntwk/websocket.hpp>
 
 #include "../asset.hpp"
+#include "../log.hpp"
 #include "../price.hpp"
 #include "../stats.hpp"
 #include "symbol_id_cache.hpp"
@@ -67,41 +69,63 @@ auto Finnhub::stats(Asset const& asset) -> Stats
     auto const asset_str = find_symbol_id(asset);
     if (!https_socket_.is_connected())
         this->make_https_connection();
-    auto const message = https_socket_.get(
-        build_rest_query("quote?symbol=" + asset_str, this->get_key()));
-    check_response(message, "Finnhub - Failed to get stats");
+    auto const request = build_rest_query(
+        "quote?symbol=" + ntwk::url_encode(asset_str), this->get_key());
+    auto const no_key_request = request.substr(0, request.find("token"));
+    log_status("accessing finnhub.io" + no_key_request);
+    try {
+        auto const message = https_socket_.get(request);
+        check_response(message, "Finnhub - Failed to get stats");
 
-    auto const element = https_json_parser().parse(message.body);
-    return {(double)element["c"], (double)element["o"]};
+        auto const element = https_json_parser().parse(message.body);
+        return {(double)element["c"], (double)element["o"]};
+    }
+    catch (std::exception const& e) {
+        log_error("Finnhub failed to retrieve stats for: " + asset.exchange +
+                  ' ' + asset.currency.base + ' ' + asset.currency.quote + ' ' +
+                  e.what());
+        return {-1., 0.};
+    }
 }
 
 auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
 {
     if (!https_socket_.is_connected())
         this->make_https_connection();
-    auto const message = https_socket_.get(
-        build_rest_query("search?q=" + query, this->get_key()));
-    check_response(message, "Finnhub - Failed to search for: " + query);
+    auto const request = build_rest_query("search?q=" + ntwk::url_encode(query),
+                                          this->get_key());
+    auto const no_key_request = request.substr(0, request.find("token"));
+    log_status("accessing finnhub.io" + no_key_request);
+    try {
+        auto const message = https_socket_.get(request);
+        check_response(message, "Finnhub - Failed to search for: " + query);
 
-    auto result      = std::vector<Search_result>{};
-    auto const array = https_json_parser().parse(message.body)["result"];
-    for (auto const& x : array) {
-        auto const description = (std::string)x["description"];
-        auto const symbol_id   = (std::string)x["symbol"];
-        auto const type        = (std::string)x["type"];
-        auto sr                = Search_result{type, description, {}};
-        if (type == "Crypto") {
-            sr.asset = find_asset(symbol_id);
-            result.push_back(sr);
+        auto result      = std::vector<Search_result>{};
+        auto const array = https_json_parser().parse(message.body)["result"];
+        for (auto const& x : array) {
+            auto const description = (std::string)x["description"];
+            auto const symbol_id   = (std::string)x["symbol"];
+            auto const type        = (std::string)x["type"];
+            auto sr                = Search_result{type, description, {}};
+            if (type == "Crypto") {
+                if (is_cached(symbol_id)) {
+                    sr.asset = find_asset(symbol_id);
+                    result.push_back(sr);
+                }
+            }
+            else if (type == "Common Stock") {
+                if (symbol_id.find('.') != std::string::npos)
+                    continue;  // Foreign Exchange
+                sr.asset = Asset{"", {symbol_id, "USD"}};
+                result.push_back(sr);
+            }
         }
-        if (type == "Common Stock") {
-            if (symbol_id.find('.') != std::string::npos)
-                continue;  // Foreign Exchange
-            sr.asset = Asset{"", {symbol_id, "USD"}};
-            result.push_back(sr);
-        }
+        return result;
     }
-    return result;
+    catch (std::exception const& e) {
+        log_error("Finnhub failed to search for: " + query + " : " + e.what());
+        return {};
+    }
 }
 
 void Finnhub::subscribe(Asset const& asset)
@@ -110,8 +134,18 @@ void Finnhub::subscribe(Asset const& asset)
                       find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
-    ws_.write(json);
-    ++subscription_count_;
+    log_status("Finnhub Websocket Subscribing: " + asset.exchange + ' ' +
+               asset.currency.base + ' ' + asset.currency.quote);
+    log_status("subscribe json: " + json);
+    try {
+        ws_.write(json);
+        ++subscription_count_;
+    }
+    catch (std::exception const& e) {
+        log_error("Finnhub failed to subscribe to: " + asset.exchange + ' ' +
+                  asset.currency.quote + ' ' + asset.currency.quote + ' ' +
+                  e.what());
+    }
 }
 
 void Finnhub::unsubscribe(Asset const& asset)
@@ -120,22 +154,38 @@ void Finnhub::unsubscribe(Asset const& asset)
                       find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
-    ws_.write(json);
-    --subscription_count_;
+    log_status("Finnhub Websocket Unsubscribing: " + asset.exchange + ' ' +
+               asset.currency.base + ' ' + asset.currency.quote);
+    try {
+        ws_.write(json);
+        --subscription_count_;
+    }
+    catch (std::exception const& e) {
+        log_error("Finnhub failed to unsubscribe to: " + asset.exchange + ' ' +
+                  asset.currency.quote + ' ' + asset.currency.quote + ' ' +
+                  e.what());
+    }
 }
 
 auto Finnhub::stream_read() -> std::vector<Price>
 {
-    auto prices = parse_prices(ws_json_parser().parse(ws_.read()));
-    // Remove Duplicates so up/down indicators work properly. Keep newest.
-    std::stable_sort(
-        std::begin(prices), std::end(prices),
-        [](auto const& a, auto const& b) { return a.asset < b.asset; });
-    auto const end = std::unique(
-        std::rbegin(prices), std::rend(prices),
-        [](auto const& a, auto const& b) { return a.asset == b.asset; });
-    prices.erase(std::begin(prices), end.base());
-    return prices;
+    try {
+        auto prices = parse_prices(ws_json_parser().parse(ws_.read()));
+        // Remove Duplicates so up/down indicators work properly. Keep newest.
+        std::stable_sort(
+            std::begin(prices), std::end(prices),
+            [](auto const& a, auto const& b) { return a.asset < b.asset; });
+        auto const end = std::unique(
+            std::rbegin(prices), std::rend(prices),
+            [](auto const& a, auto const& b) { return a.asset == b.asset; });
+        prices.erase(std::begin(prices), end.base());
+        return prices;
+    }
+    catch (std::exception const& e) {
+        log_error("Finnhub Failed to read from Websocket: " +
+                  std::string{e.what()});
+        return {};
+    }
 }
 
 }  // namespace crab

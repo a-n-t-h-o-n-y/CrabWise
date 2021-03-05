@@ -48,8 +48,11 @@ using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
     auto const message = sock.get(build_rest_query("crypto/exchange", key));
     ntwk::check_response(message, "Finnhub - Failed to read crypto exchanges");
     auto result = std::vector<std::string>{};
-    for (auto const exchange : json_parser().parse(message.body))
-        result.push_back((std::string)exchange);
+    for (auto const exchange : json_parser().parse(message.body)) {
+        auto const x = (std::string)exchange;
+        if (x != "BITTREX" && x != "OKEX")  // Do not seem to work w/finnhub
+            result.push_back(x);
+    }
     return result;
 }
 

@@ -105,6 +105,8 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
             return U"Ξ";
         if (x == "BTC")
             return U"₿";
+        if (x == "XBT")
+            return U"₿";
         if (x == "EUR")
             return U"€";
         if (x == "GBP")
@@ -145,7 +147,15 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
             return U"Ɍ";
         if (x == "STEEM")
             return U"ȿ";
-        return "";
+        if (x == "JPY")
+            return U"¥";
+        if (x == "CAD")
+            return U"$";
+        if (x == "CHF")
+            return U"₣";
+        if (x == "AUD")
+            return U"$";
+        return "_";
     }
 };
 
@@ -344,7 +354,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
             return;  // Already Added
         markets_.subscribe(asset);
         markets_.request_stats(asset);
-        auto& child = this->make_child(asset, Stats{0., 0.});
+        auto& child = this->make_child(asset, Stats{-1., 0.});
         child.remove_me.connect(
             [this, asset = child.asset()] { this->remove_ticker(asset); });
         child.listings.hamburger.pressed.connect(
@@ -458,21 +468,23 @@ class Column_labels : public ox::HArray<ox::HLabel, 7> {
     }
 };
 
+// TODO change this into something else, just something small.
 class Status_bar : public ox::HTuple<ox::Widget, ox::Tile, ox::HLabel> {
    private:
-    ox::Widget& arrow     = this->get<0>();
-    ox::Tile& buffer      = this->get<1>();
-    ox::HLabel& text_area = this->get<2>();
+    // ox::Widget& arrow     = this->get<0>();
+    // ox::Tile& buffer      = this->get<1>();
+    // ox::HLabel& text_area = this->get<2>();
 
    public:
     Status_bar()
     {
-        *this | ox::pipe::fixed_height(1);
-        arrow | ox::pipe::wallpaper(U'├') | ox::pipe::fixed_width(1) |
-            bg(ox::Color::Foreground) | fg(ox::Color::Background);
-        buffer | bg(ox::Color::Foreground) | fg(ox::Color::Background);
-        text_area.set_text(U"Status");
-        text_area | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        *this | ox::pipe::fixed_height(1) | ox::pipe::descendants() |
+            bg(crab::Foreground) | fg(crab::Background);
+        // arrow | ox::pipe::wallpaper(U'├') | ox::pipe::fixed_width(1) |
+        //     bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        // buffer | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        // text_area.set_text(U"Status");
+        // text_area | bg(ox::Color::Foreground) | fg(ox::Color::Background);
     }
 };
 

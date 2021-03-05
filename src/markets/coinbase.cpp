@@ -9,6 +9,7 @@
 
 #include <simdjson.h>
 
+#include "../log.hpp"
 #include "error.hpp"
 
 namespace {
@@ -108,33 +109,57 @@ namespace crab {
 void Coinbase::subscribe(Asset const& asset)
 {
     if (!ws_.is_connected())
-        ws_.connect("ws-feed.pro.coinbase.com");
+        this->ws_connect();
     auto const json =
         std::string{"{\"type\":\"subscribe\",\"product_ids\":[\""} +
         to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
-    ws_.write(json);
-    ++subscription_count_;
+    log_status("Coinbase Websocket Subscribing: " + asset.exchange + ' ' +
+               asset.currency.base + ' ' + asset.currency.quote);
+    try {
+        ws_.write(json);
+        ++subscription_count_;
+    }
+    catch (std::exception const& e) {
+        log_error("Coinbase failed to subscribe to: " + asset.currency.quote +
+                  ' ' + asset.currency.quote + ' ' + e.what());
+    }
 }
 
 void Coinbase::unsubscribe(Asset const& asset)
 {
     if (!ws_.is_connected())
-        ws_.connect("ws-feed.pro.coinbase.com");
+        this->ws_connect();
     auto const json =
         std::string{"{\"type\":\"unsubscribe\",\"product_ids\":[\""} +
         to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
-    ws_.write(json);
-    --subscription_count_;
+    log_status("Coinbase Websocket Unsubscribing: " + asset.exchange + ' ' +
+               asset.currency.base + ' ' + asset.currency.quote);
+    try {
+        ws_.write(json);
+        --subscription_count_;
+    }
+    catch (std::exception const& e) {
+        log_error("Coinbase failed to unsubscribe to: " + asset.currency.quote +
+                  ' ' + asset.currency.quote + ' ' + e.what());
+    }
 }
 
 auto Coinbase::stream_read() -> Price
 {
     if (!ws_.is_connected())
-        ws_.connect("ws-feed.pro.coinbase.com");
+        this->ws_connect();
 
     auto price = std::optional<Price>{std::nullopt};
-    while (!price)
-        price = parse(ws_.read());
+    while (!price) {
+        try {
+            price = parse(ws_.read());
+        }
+        catch (std::exception const& e) {
+            log_error("Coinbase Failed to read from Websocket: " +
+                      std::string{e.what()});
+            return {};
+        }
+    }
     return *price;
 }
 

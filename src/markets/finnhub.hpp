@@ -1,6 +1,8 @@
 #ifndef CRAB_MARKETS_FINNHUB_HPP
 #define CRAB_MARKETS_FINNHUB_HPP
+#include <exception>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -10,6 +12,7 @@
 #include <simdjson.h>
 
 #include "../asset.hpp"
+#include "../log.hpp"
 #include "../price.hpp"
 #include "../search_result.hpp"
 #include "../stats.hpp"
@@ -21,7 +24,17 @@ namespace crab {
 class Finnhub {
    public:
     /// Connect internal https socket.
-    void make_https_connection() { https_socket_.connect("finnhub.io"); }
+    void make_https_connection()
+    {
+        log_status("HTTPS connect: finnhub.io");
+        try {
+            https_socket_.connect("finnhub.io");
+        }
+        catch (std::exception const& e) {
+            log_error("Finnhub failed to connect over HTTPS: " +
+                      std::string{e.what()});
+        }
+    }
 
     /// Disconnect internal https socket.
     void disconnect_https() { https_socket_.disconnect(); }
@@ -66,17 +79,38 @@ class Finnhub {
         auto file = std::ifstream{filename};
         auto key  = std::string{};
         file >> key;
+        if (key.empty()) {
+            throw std::runtime_error{
+                "Invalid Finnhub Key; place key in `finnhub.key` in directory "
+                "app is running from."};
+        }
         return key;
     }
 
     auto get_key() -> std::string const&
     {
-        if (key_param_.empty())
-            key_param_ = "token=" + parse_key("finnhub.key");
+        if (key_param_.empty()) {
+            try {
+                key_param_ = "token=" + parse_key("finnhub.key");
+            }
+            catch (std::exception const& e) {
+                log_error(e.what());
+            }
+        }
         return key_param_;
     }
 
-    void ws_connect() { ws_.connect("ws.finnhub.io", "/?" + this->get_key()); }
+    void ws_connect()
+    {
+        log_status("Websocket connect: ws.finnhub.io");
+        try {
+            ws_.connect("ws.finnhub.io", "/?" + this->get_key());
+        }
+        catch (std::exception const& e) {
+            log_error("Finnhub Websocket failed to connect: " +
+                      std::string{e.what()});
+        }
+    }
 };
 
 }  // namespace crab

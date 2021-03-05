@@ -12,5 +12,8 @@ namespace crab {
 /// Return the Asset cooresponding to the given Finnhub 'symbol_id'.
 [[nodiscard]] auto find_asset(std::string const& symbol_id) -> Asset;
 
+/// Return whether or not the symbol_id is cached.
+[[nodiscard]] auto is_cached(std::string const& symbol_id) -> bool;
+
 }  // namespace crab
 #endif  // CRAB_MARKETS_SYMBOL_ID_CACHE_HPP
