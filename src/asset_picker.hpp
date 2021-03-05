@@ -183,7 +183,7 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
     {
         link(scrollbar, textbox);
 
-        this->wrapped() | ox::pipe::fixed_height(8);
+        this->wrapped() | ox::pipe::fixed_height(12);
 
         textbox.disable_input();
         textbox | ox::pipe::no_focus();
@@ -193,12 +193,80 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
    private:
     static void add_info(ox::Textbox& tb)
     {
-        auto info = ox::Glyph_string{
-            U"This is an information box with some information within it, some "
-            U"things can be "};
-        info.append(U"bold" | ox::Trait::Bold);
-        info.append(U", and some things are ");
-        info.append(U"colorful" | fg(crab::Red));
+        using ox::Trait;
+        auto const div = [](ox::Glyph_string& x) {
+            auto constexpr width = 24;
+            x.append(U'\n');
+            x.append(std::u32string(width, U'─') | fg(crab::Red));
+            x.append(U'\n');
+        };
+
+        auto info = ox::Glyph_string{U"finnhub.key" | Trait::Bold};
+        info.append(U": *Required File* Get a free Finnhub key from ");
+        info.append(U"finnhub.io" | Trait::Underline);
+        info.append(
+            U" and place it in the same directory the app will run in.");
+
+        div(info);
+
+        info.append(U"assets.txt" | Trait::Bold);
+        info.append(
+            U": *Optional File* A list of assets to initialize the program "
+            U"with. Located in the same directory the app is running from.\n");
+        info.append(U"Format:\n");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Exchange");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U":\n");
+        info.append(U"    ");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Base");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U' ');
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Quote");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U'\n');
+        info.append(U"    ");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Base");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U' ');
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Quote");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U'\n');
+        info.append(U"Stock:\n");
+        info.append(U"    ");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Symbol");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U'\n');
+        info.append(U"    ");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Symbol");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U'\n');
+        info.append(U"# <- Comment");
+
+        div(info);
+
+        info.append(
+            U"Handle 𝍢 can be clicked and dragged to rearrange ordering. "
+            U"Reorder only happens when mouse moves from one handle to another "
+            U"handle.");
+
+        div(info);
+
+        info.append(U"Press 'x' to remove an asset.");
+
+        div(info);
+
+        info.append(
+            U"Search relies on the Finnhub API, best when you know exactly the "
+            U"asset you are searching for. Include the exchange, and the base "
+            U"and quote currencies, divided by a '/' for best results. Yeah, "
+            U"search result scrolling is weird.");
 
         tb.clear();
         tb.set_contents(info);
