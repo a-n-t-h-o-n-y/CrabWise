@@ -83,6 +83,12 @@ class Markets {
         coinbase_loop_.exit(0);
         coinbase_loop_.wait();
         coinbase_.disconnect_websocket();
+
+        stats_loop_.exit(0);
+        stats_loop_.wait();
+
+        search_loop_.exit(0);
+        search_loop_.wait();
     }
 
     void request_stats(Asset const& asset)
