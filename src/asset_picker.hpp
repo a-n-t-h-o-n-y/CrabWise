@@ -7,12 +7,6 @@
 #include "asset.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
-#include "termox/widget/pipe.hpp"
-#include "termox/widget/widgets/accordion.hpp"
-#include "termox/widget/widgets/scrollbar.hpp"
-#include "termox/widget/widgets/spinner.hpp"
-#include "termox/widget/widgets/text_display.hpp"
-#include "termox/widget/widgets/textbox.hpp"
 
 namespace crab {
 
@@ -34,9 +28,9 @@ class Search_input
         *this | fixed_height(1);
         button | label(U" Search" | ox::Trait::Bold) | fixed_width(8) |
             bg(crab::Light_gray) | fg(crab::Background);
-        spinner | bg(crab::Gray);
+        spinner | bg(crab::Almost_bg);
         spinner.start();
-        search_field | bg(crab::Gray);
+        search_field | bg(crab::Almost_bg);
 
         search_field.edit_finished.connect(
             [this](std::string const& s) { this->search_request(s); });
@@ -131,7 +125,9 @@ class Search_results_groups
         stocks.selected.connect(
             [this](Asset const& a) { this->selected.emit(a); });
         crypto.label.set_text(U"Crypto");
+        crypto.label | fg(crab::Light_gray);
         stocks.label.set_text(U"Stocks");
+        stocks.label | fg(crab::Light_gray);
     }
 
    public:
@@ -218,7 +214,7 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
         info.append(U"Exchange");
         info.append(U']' | fg(crab::Gray));
         info.append(U":\n");
-        info.append(U"    ");
+        info.append(U"  ");
         info.append(U'[' | fg(crab::Gray));
         info.append(U"Base");
         info.append(U']' | fg(crab::Gray));
@@ -226,8 +222,12 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
         info.append(U'[' | fg(crab::Gray));
         info.append(U"Quote");
         info.append(U']' | fg(crab::Gray));
+        info.append(U' ');
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Count");
+        info.append(U']' | fg(crab::Gray));
         info.append(U'\n');
-        info.append(U"    ");
+        info.append(U"  ");
         info.append(U'[' | fg(crab::Gray));
         info.append(U"Base");
         info.append(U']' | fg(crab::Gray));
@@ -237,17 +237,21 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
         info.append(U']' | fg(crab::Gray));
         info.append(U'\n');
         info.append(U"Stock:\n");
-        info.append(U"    ");
+        info.append(U"  ");
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Symbol");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U' ');
+        info.append(U'[' | fg(crab::Gray));
+        info.append(U"Count");
+        info.append(U']' | fg(crab::Gray));
+        info.append(U'\n');
+        info.append(U"  ");
         info.append(U'[' | fg(crab::Gray));
         info.append(U"Symbol");
         info.append(U']' | fg(crab::Gray));
         info.append(U'\n');
-        info.append(U"    ");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Symbol");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U'\n');
-        info.append(U"# <- Comment");
+        info.append(U"# Comment");
 
         div(info);
 

@@ -26,3 +26,5 @@ Stock:
     MSFT
     TSLA
 ```
+
+Use with a Terminal that supports True Color.
