@@ -434,6 +434,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
     [[nodiscard]] auto asset() const -> Asset const& { return asset_; }
 
+    [[nodiscard]] auto quantity() const -> double
+    {
+        return listings.quantity.quantity();
+    }
+
    private:
     [[nodiscard]] static auto calc_value(double quantity, double last_price)
         -> double

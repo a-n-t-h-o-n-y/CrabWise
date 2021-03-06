@@ -94,12 +94,16 @@ class Markets {
     void request_stats(Asset const& asset)
     {
         auto const lock = stats_requested_.lock();
+        if (!stats_loop_.is_running())
+            this->launch_stats_loop();
         stats_requested_.push_back(asset);
     }
 
     void request_search(std::string const& query)
     {
         auto const lock = search_requested_.lock();
+        if (!search_loop_.is_running())
+            this->launch_search_loop();
         search_requested_.push_back(query);
     }
 

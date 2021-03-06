@@ -1,7 +1,10 @@
 #ifndef CRAB_CRABWISE_HPP
 #define CRAB_CRABWISE_HPP
 #include <cctype>
+#include <chrono>
+#include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -16,24 +19,41 @@
 
 namespace crab {
 
-// TODO change this into something else, just something small.
-class Status_bar : public ox::HTuple<ox::Widget, ox::Tile, ox::HLabel> {
+class Status_box : public ox::HTuple<ox::Widget, ox::HLabel> {
    private:
-    // ox::Widget& arrow     = this->get<0>();
-    // ox::Tile& buffer      = this->get<1>();
-    // ox::HLabel& text_area = this->get<2>();
+    ox::Widget& arrow     = this->get<0>();
+    ox::HLabel& text_area = this->get<1>();
+
+   public:
+    Status_box()
+    {
+        *this | ox::pipe::fixed_height(1) | ox::pipe::descendants() |
+            bg(crab::Foreground) | fg(crab::Background);
+        arrow | ox::pipe::wallpaper(U'/') | ox::pipe::fixed_width(1) |
+            bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        text_area | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+    }
+
+   public:
+    void set_status(ox::Glyph_string const& x) { text_area.set_text(x); }
+};
+
+class Status_bar : public ox::HPair<Status_box, ox::Button> {
+   public:
+    Status_box& status_box = this->first;
+    ox::Button& save_btn   = this->second;
 
    public:
     Status_bar()
     {
-        *this | ox::pipe::fixed_height(1) | ox::pipe::descendants() |
-            bg(crab::Foreground) | fg(crab::Background);
-        // arrow | ox::pipe::wallpaper(U'├') | ox::pipe::fixed_width(1) |
-        //     bg(ox::Color::Foreground) | fg(ox::Color::Background);
-        // buffer | bg(ox::Color::Foreground) | fg(ox::Color::Background);
-        // text_area.set_text(U"Status");
-        // text_area | bg(ox::Color::Foreground) | fg(ox::Color::Background);
+        *this | ox::pipe::fixed_height(1);
+        save_btn.set_label(U"Save Snapshot" | ox::Trait::Bold);
+        save_btn | bg(crab::Yellow) | fg(crab::Background) |
+            ox::pipe::fixed_width(17);
     }
+
+   public:
+    void set_status(ox::Glyph_string const& x) { status_box.set_status(x); }
 };
 
 class App_space
@@ -73,6 +93,68 @@ class App_space
                 for (auto const& search_result : results)
                     asset_picker.search_results.add_result(search_result);
             });
+        status_bar.save_btn.pressed.connect([this] { this->save_snapshot(); });
+    }
+
+   private:
+    void save_snapshot()
+    {
+        auto const contents    = generate_save_string(ticker_list);
+        auto const dt_filename = generate_datetime_filename();
+        {
+            auto file = std::ofstream{dt_filename};
+            file << contents;
+        }
+        {
+            auto file = std::ofstream{"assets.txt"};
+            file << contents;
+        }
+        status_bar.set_status("Snapshot saved to: " + dt_filename +
+                              " and assets.txt");
+    }
+
+   private:
+    [[nodiscard]] static auto generate_datetime_stamp() -> std::string
+    {
+        using Clock_t     = std::chrono::system_clock;
+        auto const now    = Clock_t::to_time_t(Clock_t::now());
+        auto const now_tm = *std::localtime(&now);
+        auto ss           = std::stringstream{};
+        ss << std::put_time(&now_tm, "%F_%T");
+        return ss.str();
+    }
+
+    [[nodiscard]] static auto generate_datetime_filename() -> std::string
+    {
+        return "assets." + generate_datetime_stamp() + ".txt";
+    }
+
+    [[nodiscard]] static auto to_string(Ticker& ticker, bool add_exchange)
+        -> std::string
+    {
+        auto result = std::string{};
+        if (add_exchange) {
+            auto exchange = ticker.asset().exchange;
+            if (exchange.empty())
+                exchange = "Stock";
+            result.append(exchange + ":\n");
+        }
+        result.append("    " + ticker.asset().currency.base + ' ' +
+                      ticker.asset().currency.quote + ' ' +
+                      std::to_string(ticker.quantity()) + '\n');
+        return result;
+    }
+
+    [[nodiscard]] static auto generate_save_string(Ticker_list& list)
+        -> std::string
+    {
+        auto result   = std::string{};
+        auto exchange = std::string{};
+        for (Ticker& child : list.get_children()) {
+            result.append(to_string(child, exchange != child.asset().exchange));
+            exchange = child.asset().exchange;
+        }
+        return result;
     }
 };
 
@@ -90,6 +172,14 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         auto const init_assets = parse_init_file(init_filename);
         for (auto const& [asset, quantity] : init_assets)
             app_space.ticker_list.add_ticker(asset, quantity);
+        auto file = std::fstream{"finnhub.key"};
+        if (!file.good()) {
+            app_space.status_bar.set_status(
+                ("Error" | fg(crab::Red) | ox::Trait::Bold)
+                    .append(": Missing `finnhub.key` file. Go to finnhub.io & "
+                            "register for a free API key. Then place in same "
+                            "directory this app is run from."));
+        }
     }
 
    private:
@@ -152,8 +242,10 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     [[nodiscard]] static auto parse_init_file(std::string const& filename)
         -> std::vector<std::pair<Asset, double>>
     {
-        auto result           = std::vector<std::pair<Asset, double>>{};
-        auto file             = std::ifstream{filename};
+        auto result = std::vector<std::pair<Asset, double>>{};
+        auto file   = std::ifstream{filename};
+        if (!file.good())
+            return {};
         auto line             = std::string{};
         auto current_exchange = std::string{};
         while (std::getline(file, line, '\n')) {
