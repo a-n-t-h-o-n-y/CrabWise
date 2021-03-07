@@ -2,9 +2,12 @@
 
 Crypto and US Stock Viewer in the Terminal.
 
-Currently supports Coinbase and Finnhub.
+Supports Coinbase, KuCoin, Kraken, HitBTC, Binance, ZB, Huobi, Poloniex, Gemini,
+and Bitfinex as well as stocks from NYSE and Nasdaq.
 
-<!-- TODO Insert Photo -->
+<p align="center">
+  <img src="docs/images/crabwise.png">
+</p>
 
 ## Instructions
 
@@ -25,12 +28,16 @@ in plaintext and is loaded next time the app is opened.
 
 ## `assets.txt`
 
-This is the the file your data is stored in, it has a simple enough format. `#`
-starts a comment, has to be on its own line. Exchanges can be listed multiple
-times, the order listed is the order read into the program. Quantities are
-optional. Any number of whitespace is used a separator. Base currency is listed
-first, then the currency it is quoted in on the exchange. Stocks are listed with
-the literal 'Stocks' header.
+This file does not have to be created manually, starting CrabWise for the first
+time, adding assets from the search bar, and saving will create this file. This
+file is overwritten each time 'Save Snapshot' is clicked.
+
+This is the file your data is stored in, it has a simple format. `#` starts a
+comment, has to be on its own line. Exchanges can be listed multiple times, the
+order listed is the order read into the program. Quantities are optional. Any
+number of whitespace is used a separator. Base currency is listed first, then
+the currency it is quoted in on the exchange. Stocks are listed with the literal
+'Stocks' header.
 
 ```txt
 Coinbase:

@@ -171,7 +171,7 @@ class Price_display : public ox::HArray<ox::HLabel, 2> {
     Price_display()
     {
         using namespace ox::pipe;
-        symbol | fixed_width(3) | align_center() | ox::Trait::Dim;
+        symbol | fixed_width(3) | align_center();
     }
 
    public:
@@ -264,7 +264,7 @@ class Percent_display : public ox::HArray<ox::HLabel, 2> {
     {
         using namespace ox::pipe;
         value | align_right();
-        symbol | fixed_width(3) | ox::Trait::Dim | align_center();
+        symbol | fixed_width(3) | align_center();
         symbol.set_text(U"%");
         *this | fixed_width(18);
     }
