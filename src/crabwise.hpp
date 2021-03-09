@@ -3,6 +3,7 @@
 #include <cctype>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -13,6 +14,7 @@
 #include <termox/termox.hpp>
 
 #include "asset_picker.hpp"
+#include "filenames.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
 #include "ticker_list.hpp"
@@ -47,9 +49,9 @@ class Status_bar : public ox::HPair<Status_box, ox::Button> {
     Status_bar()
     {
         *this | ox::pipe::fixed_height(1);
-        save_btn.set_label(U"Save Snapshot" | ox::Trait::Bold);
+        save_btn.set_label(U"Save" | ox::Trait::Bold);
         save_btn | bg(crab::Yellow) | fg(crab::Background) |
-            ox::pipe::fixed_width(17);
+            ox::pipe::fixed_width(8);
     }
 
    public:
@@ -93,42 +95,21 @@ class App_space
                 for (auto const& search_result : results)
                     asset_picker.search_results.add_result(search_result);
             });
-        status_bar.save_btn.pressed.connect([this] { this->save_snapshot(); });
+        status_bar.save_btn.pressed.connect([this] { this->save_state(); });
     }
 
    private:
-    void save_snapshot()
+    void save_state()
     {
-        auto const contents    = generate_save_string(ticker_list);
-        auto const dt_filename = generate_datetime_filename();
+        auto const filepath = assets_filepath();
         {
-            auto file = std::ofstream{dt_filename};
-            file << contents;
+            auto file = std::ofstream{filepath};
+            file << generate_save_string(ticker_list);
         }
-        {
-            auto file = std::ofstream{"assets.txt"};
-            file << contents;
-        }
-        status_bar.set_status("Snapshot saved to: " + dt_filename +
-                              " and assets.txt");
+        status_bar.set_status("Snapshot saved to: " + filepath.string());
     }
 
    private:
-    [[nodiscard]] static auto generate_datetime_stamp() -> std::string
-    {
-        using Clock_t     = std::chrono::system_clock;
-        auto const now    = Clock_t::to_time_t(Clock_t::now());
-        auto const now_tm = *std::localtime(&now);
-        auto ss           = std::stringstream{};
-        ss << std::put_time(&now_tm, "%F_%T");
-        return ss.str();
-    }
-
-    [[nodiscard]] static auto generate_datetime_filename() -> std::string
-    {
-        return "assets." + generate_datetime_stamp() + ".txt";
-    }
-
     [[nodiscard]] static auto to_string(Ticker& ticker, bool add_exchange)
         -> std::string
     {
@@ -164,22 +145,14 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     App_space& app_space   = this->get<1>();
 
    public:
-    /// Reads \p init_filename and adds currencies.
-    Crabwise(std::string const& init_filename)
+    /// Reads \p assets.txt and adds currencies.
+    Crabwise()
     {
         titlebar.title.set_text(U"CrabWise" | ox::Trait::Bold);
         ox::Terminal::set_palette(crab::palette);
-        auto const init_assets = parse_init_file(init_filename);
+        auto const init_assets = parse_init_file(assets_filepath());
         for (auto const& [asset, quantity] : init_assets)
             app_space.ticker_list.add_ticker(asset, quantity);
-        auto file = std::fstream{"finnhub.key"};
-        if (!file.good()) {
-            app_space.status_bar.set_status(
-                ("Error" | fg(crab::Red) | ox::Trait::Bold)
-                    .append(": Missing `finnhub.key` file. Go to finnhub.io & "
-                            "register for a free API key. Then place in same "
-                            "directory this app is run from."));
-        }
     }
 
    private:
@@ -239,13 +212,14 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     //     Symbol Quantity
     //     Symbol Quantity
     // # Comment
-    [[nodiscard]] static auto parse_init_file(std::string const& filename)
+    [[nodiscard]] static auto parse_init_file(
+        std::filesystem::path const& filepath)
         -> std::vector<std::pair<Asset, double>>
     {
-        auto result = std::vector<std::pair<Asset, double>>{};
-        auto file   = std::ifstream{filename};
-        if (!file.good())
+        if (!std::filesystem::exists(filepath))
             return {};
+        auto result           = std::vector<std::pair<Asset, double>>{};
+        auto file             = std::ifstream{filepath};
         auto line             = std::string{};
         auto current_exchange = std::string{};
         while (std::getline(file, line, '\n')) {

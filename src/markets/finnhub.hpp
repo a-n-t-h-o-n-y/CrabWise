@@ -1,6 +1,8 @@
 #ifndef CRAB_MARKETS_FINNHUB_HPP
 #define CRAB_MARKETS_FINNHUB_HPP
+#include <cassert>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -12,6 +14,7 @@
 #include <simdjson.h>
 
 #include "../asset.hpp"
+#include "../filenames.hpp"
 #include "../log.hpp"
 #include "../price.hpp"
 #include "../search_result.hpp"
@@ -73,17 +76,14 @@ class Finnhub {
     int subscription_count_ = 0;
 
    private:
-    [[nodiscard]] static auto parse_key(std::string const& filename)
+    [[nodiscard]] static auto parse_key(std::filesystem::path const& filepath)
         -> std::string
     {
-        auto file = std::ifstream{filename};
+        auto file = std::ifstream{filepath};
         auto key  = std::string{};
         file >> key;
-        if (key.empty()) {
-            throw std::runtime_error{
-                "Invalid Finnhub Key; place key in `finnhub.key` in directory "
-                "app is running from."};
-        }
+        if (key.empty())
+            throw std::runtime_error{"Empty Finnhub API Key in finnhub.key"};
         return key;
     }
 
@@ -91,7 +91,7 @@ class Finnhub {
     {
         if (key_param_.empty()) {
             try {
-                key_param_ = "token=" + parse_key("finnhub.key");
+                key_param_ = "token=" + parse_key(finnhub_key_filepath());
             }
             catch (std::exception const& e) {
                 log_error(e.what());

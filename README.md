@@ -9,28 +9,52 @@ and Bitfinex as well as stocks from NYSE and Nasdaq.
   <img src="docs/images/crabwise.png">
 </p>
 
+## Build Instructions
+
+This project uses git submodules and cmake to compile. It should build on Linux
+and MacOS.
+
+It requires OpenSSL and Boost Static Libraries being installed on your system.
+Modify the `CMakeLists.txt` files if you want to link to the dynamic versions of
+these libraries.
+
+```sh
+git clone https://github.com/a-n-t-h-o-n-y/CrabWise.git
+cd CrabWise/
+mkdir build && cd build/
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make crabwise    # Build the app locally
+make install     # Optional install to gnu default directories(TODO - not yet)
+```
+
 ## Instructions
 
-Create a directory to store your CrabWise data.
+You'll need to register for a free Finnhub API key [here](https://finnhub.io/)
+in order to get live data for most markets.
 
-Register for a Finnhub API key [here](https://finnhub.io/), and place the key in
-a file named `finnhub.key` in the same directory that CrabWise runs from.
+When the app is run for the first time, you'll pass in your Finnhub API key via
+the command line, the application will remember this on subsequent startups, and
+can be replaced anytime by passing a new key via the command line.
 
-`cd` to your directory and run `./crabwise`.
+All data is stored in the `~/Documents/crabwise/` directory. You'll find a few
+files here:
 
-Search for assets to add by expanding the sidebar and using the search bar,
-click on assets to add them, x to delete them.
+- `finnhub.key`: Your Finnhub API Key
 
-Type in quantities of each asset you own.
+- `assets.txt`: Store of your current assets, saved on `Save` button press.
 
-Click on the `Save Snapshot` button in the bottom right corner. Data is stored
-in plaintext and is loaded next time the app is opened.
+- `crabwise.log`: Status and Error logs, if having network issues, look here.
 
-## `assets.txt`
+Once the app is up and running, you can search for assets by expanding the
+sidebar and using the search bar. Click on an asset to add it, x to delete it.
 
-This file does not have to be created manually, starting CrabWise for the first
-time, adding assets from the search bar, and saving will create this file. This
-file is overwritten each time 'Save Snapshot' is clicked.
+You can then type in the quantity of the asset you own under the `Quantity`
+column, which will update the `Value` column and will be stored in `assets.txt`.
+
+Click on the `Save` button in the bottom right corner. This will save the
+current state of the app, so it can be reloaded later.
+
+## `assets.txt` Format
 
 This is the file your data is stored in, it has a simple format. `#` starts a
 comment, has to be on its own line. Exchanges can be listed multiple times, the
@@ -57,3 +81,7 @@ Stock:
 ```
 
 Use with a Terminal that supports True Color.
+
+Make sure ssl certificates are installed on your system in the usual locations.
+OpenSSL via homebrew installs these on MacOS, and `ca-certificates` package on
+linux.

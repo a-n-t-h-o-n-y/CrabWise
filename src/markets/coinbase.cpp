@@ -77,7 +77,7 @@ auto parse_trade(JSON_element_t const& e) -> std::optional<crab::Price>
              {extract_base_currency(e), extract_quote_currency(e)}}};
     }
     catch (std::exception const& e) {
-        assert(false);
+        crab::log_error("Coinbase could not parse trade json element.");
         return std::nullopt;
     }
 }

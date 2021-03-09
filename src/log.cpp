@@ -4,12 +4,14 @@
 #include <mutex>
 #include <string>
 
+#include "filenames.hpp"
+
 namespace {
 
 [[nodiscard]] auto file() -> std::ofstream&
 {
     static auto file_ = [] {
-        auto fs = std::ofstream{"crabwise.log", std::ios_base::app};
+        auto fs = std::ofstream{crab::log_filepath(), std::ios_base::app};
         fs << "\n\n--------\n\n";
         return fs;
     }();

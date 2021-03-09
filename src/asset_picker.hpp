@@ -197,18 +197,11 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
             x.append(U'\n');
         };
 
-        auto info = ox::Glyph_string{U"finnhub.key" | Trait::Bold};
-        info.append(U": *Required File* Get a free Finnhub key from ");
-        info.append(U"finnhub.io" | Trait::Underline);
+        auto info = ox::Glyph_string{};
+        info.append(U"~/Documents/crabwise/assets.txt\n" | Trait::Bold);
         info.append(
-            U" and place it in the same directory the app will run in.");
-
-        div(info);
-
-        info.append(U"assets.txt" | Trait::Bold);
-        info.append(
-            U": *Optional File* A list of assets to initialize the program "
-            U"with. Located in the same directory the app is running from.\n");
+            U"This file contains your saved assets, it is plaintext,"
+            " readable and editable.\n");
         info.append(U"Format:\n");
         info.append(U'[' | fg(crab::Gray));
         info.append(U"Exchange");
