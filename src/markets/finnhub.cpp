@@ -72,14 +72,15 @@ auto Finnhub::stats(Asset const& asset) -> Stats
         this->make_https_connection();
     auto const request = build_rest_query(
         "quote?symbol=" + ntwk::url_encode(asset_str), this->get_key_param());
-    auto const no_key_request = request.substr(0, request.find("token"));
-    log_status("accessing finnhub.io" + no_key_request);
+    {
+        auto const no_key_request = request.substr(0, request.find("token"));
+        log_status("accessing finnhub.io" + no_key_request);
+    }
     try {
         auto const message = https_socket_.get(request);
         check_response(message, "Finnhub - Failed to get stats");
-
         auto const element = https_json_parser().parse(message.body);
-        return {(double)element["c"], (double)element["o"]};
+        return {(double)element["c"], (double)element["pc"]};
     }
     catch (std::exception const& e) {
         log_error("Finnhub failed to retrieve stats for: " + asset.exchange +
