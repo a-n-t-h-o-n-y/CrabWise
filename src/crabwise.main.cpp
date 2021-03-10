@@ -1,5 +1,4 @@
 #include <chrono>
-#include <filesystem>
 #include <iostream>
 #include <string_view>
 #include <thread>
@@ -8,6 +7,7 @@
 
 #include "crabwise.hpp"
 #include "filenames.hpp"
+#include "filesystem.hpp"
 #include "markets/error.hpp"
 #include "symbol_id_json.hpp"
 
@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
             auto file = std::ofstream{key_path};
             file << key;
         }
-        if (!std::filesystem::exists(key_path)) {
+        if (!crab::fs::exists(key_path)) {
             std::cerr << "Must pass in a Finnhub API Key on first use.\n"
                          "Go to finnhub.io and register for a free API key.\n"
                          "Then pass the key to the command line when opening "
@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
     }
 
     // Generate Symbol Ids from Finnhub, if they do not exist.
-    if (!std::filesystem::exists(crab::symbol_ids_json_filepath())) {
+    if (!crab::fs::exists(crab::symbol_ids_json_filepath())) {
         try {
             std::cout << "Setting up Symbol ID database on first run.\n"
                       << "Will take a minute...\n";

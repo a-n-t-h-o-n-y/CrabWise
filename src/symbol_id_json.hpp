@@ -1,11 +1,11 @@
 #ifndef CRAB_SYMBOL_ID_JSON_HPP
 #define CRAB_SYMBOL_ID_JSON_HPP
-#include <filesystem>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "asset.hpp"
+#include "filesystem.hpp"
 
 namespace crab {
 
@@ -13,7 +13,7 @@ namespace crab {
 void write_ids_json();
 
 /// Read in symbol ids and cooresponding Assets from given \p filepath json.
-auto read_ids_json(std::filesystem::path const& filepath)
+auto read_ids_json(fs::path const& filepath)
     -> std::vector<std::pair<std::string, Asset>>;
 
 }  // namespace crab

@@ -14,6 +14,7 @@
 #include "asset.hpp"
 #include "currency_pair.hpp"
 #include "filenames.hpp"
+#include "filesystem.hpp"
 #include "ntwk/https_socket.hpp"
 
 namespace {
@@ -148,7 +149,7 @@ void write_ids_json()
     sock.disconnect();
 }
 
-auto read_ids_json(std::filesystem::path const& filepath)
+auto read_ids_json(fs::path const& filepath)
     -> std::vector<std::pair<std::string, Asset>>
 {
     auto doc    = json_parser().load(filepath.string());

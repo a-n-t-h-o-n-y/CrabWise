@@ -3,7 +3,6 @@
 #include <cctype>
 #include <chrono>
 #include <ctime>
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -15,6 +14,7 @@
 
 #include "asset_picker.hpp"
 #include "filenames.hpp"
+#include "filesystem.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
 #include "ticker_list.hpp"
@@ -212,11 +212,10 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     //     Symbol Quantity
     //     Symbol Quantity
     // # Comment
-    [[nodiscard]] static auto parse_init_file(
-        std::filesystem::path const& filepath)
+    [[nodiscard]] static auto parse_init_file(fs::path const& filepath)
         -> std::vector<std::pair<Asset, double>>
     {
-        if (!std::filesystem::exists(filepath))
+        if (!fs::exists(filepath))
             return {};
         auto result           = std::vector<std::pair<Asset, double>>{};
         auto file             = std::ifstream{filepath};

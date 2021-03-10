@@ -8,7 +8,16 @@ add_executable(crabwise
     crabwise.main.cpp
 )
 
-target_link_libraries(crabwise PRIVATE TermOx markets ntwk simdjson)
+find_package(Boost 1.66 REQUIRED COMPONENTS filesystem)
+
+target_link_libraries(crabwise
+    PRIVATE
+        TermOx
+        markets
+        ntwk
+        simdjson
+        Boost::filesystem
+)
 
 include(GNUInstallDirs)
 install(TARGETS crabwise

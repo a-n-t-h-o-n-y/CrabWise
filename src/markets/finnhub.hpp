@@ -2,7 +2,6 @@
 #define CRAB_MARKETS_FINNHUB_HPP
 #include <cassert>
 #include <exception>
-#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -15,6 +14,7 @@
 
 #include "../asset.hpp"
 #include "../filenames.hpp"
+#include "../filesystem.hpp"
 #include "../log.hpp"
 #include "../price.hpp"
 #include "../search_result.hpp"
@@ -78,8 +78,7 @@ class Finnhub {
     Symbol_ID_cache id_cache_ = read_ids_json(symbol_ids_json_filepath());
 
    private:
-    [[nodiscard]] static auto parse_key(std::filesystem::path const& filepath)
-        -> std::string
+    [[nodiscard]] static auto parse_key(fs::path const& filepath) -> std::string
     {
         auto file = std::ifstream{filepath};
         auto key  = std::string{};
