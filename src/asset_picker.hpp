@@ -135,7 +135,7 @@ class Search_results_groups
     {
         if (search_result.type == "Crypto")
             crypto.add_result(search_result);
-        else if (search_result.type == "Common Stock")
+        else
             stocks.add_result(search_result);
     }
 

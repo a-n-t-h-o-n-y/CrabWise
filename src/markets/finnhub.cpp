@@ -115,7 +115,7 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
                     result.push_back(sr);
                 }
             }
-            else if (type == "Common Stock") {
+            else {
                 if (symbol_id.find('.') != std::string::npos)
                     continue;  // Foreign Exchange
                 sr.asset = Asset{"", {symbol_id, "USD"}};
