@@ -1,15 +1,19 @@
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <string_view>
+#include <thread>
 
 #include <termox/termox.hpp>
 
 #include "crabwise.hpp"
 #include "filenames.hpp"
 #include "markets/error.hpp"
+#include "symbol_id_json.hpp"
 
 int main(int argc, char* argv[])
 {
+    // Write key to file if does not exist
     try {
         auto const key_path = crab::finnhub_key_filepath();
         if (argc > 1) {
@@ -29,5 +33,20 @@ int main(int argc, char* argv[])
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
+
+    // Generate Symbol Ids from Finnhub, if they do not exist.
+    if (!std::filesystem::exists(crab::symbol_ids_json_filepath())) {
+        try {
+            std::cout << "Setting up Symbol ID database on first run.\n"
+                      << "Will take a minute...\n";
+            crab::write_ids_json();
+            std::cout << "Symbol IDs initialized!\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds{400});
+        }
+        catch (std::exception const& e) {
+            std::cerr << "Failed to generate symbol ids: " << e.what() << '\n';
+        }
+    }
+
     return ox::System{ox::Mouse_mode::Drag}.run<crab::Crabwise>();
 }

@@ -348,7 +348,7 @@ class Listings : public ox::HTuple<Hamburger,
         buffer_2 | fixed_width(2);
         opening_price | fixed_width(16);
         buffer_3 | fixed_width(3);
-        quantity | fixed_width(10);
+        quantity | fixed_width(12);
         buffer_4 | fixed_width(2);
     }
 };
@@ -603,14 +603,14 @@ class Column_labels : public ox::HArray<ox::HLabel, 11> {
         buffer_2 | fixed_width(2);
         last_price.set_text(U"   Last Price" | ox::Trait::Bold);
         last_price | fixed_width(14);
-        percent_change.set_text(U"Change    " | ox::Trait::Bold);
+        percent_change.set_text(U"Change   " | ox::Trait::Bold);
         percent_change | align_right() | fixed_width(18);
         buffer_3 | fixed_width(2);
         opening_price.set_text(U"   Opening Price" | ox::Trait::Bold);
         opening_price | fixed_width(16);
         buffer_4 | fixed_width(3);
         quantity.set_text(U"Quantity" | ox::Trait::Bold);
-        quantity | fixed_width(10);
+        quantity | fixed_width(12);
         buffer_5 | fixed_width(2);
         value.set_text(U"   Value" | ox::Trait::Bold);
     }

@@ -33,7 +33,8 @@ namespace {
 
 using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
 
-[[nodiscard]] auto parse_prices(JSON_element_t const& e)
+[[nodiscard]] auto parse_prices(JSON_element_t const& e,
+                                crab::Symbol_ID_cache& id_cache)
     -> std::vector<crab::Price>
 {
     if ((std::string)e["type"] != "trade")
@@ -42,8 +43,8 @@ using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
     auto result      = std::vector<crab::Price>{};
     for (auto const& item : array) {
         auto const symbol_id = (std::string)item["s"];
-        result.push_back(
-            {std::to_string((double)item["p"]), crab::find_asset(symbol_id)});
+        result.push_back({std::to_string((double)item["p"]),
+                          id_cache.find_asset(symbol_id)});
     }
     return result;
 }
@@ -66,11 +67,11 @@ namespace crab {
 
 auto Finnhub::stats(Asset const& asset) -> Stats
 {
-    auto const asset_str = find_symbol_id(asset);
+    auto const asset_str = id_cache_.find_symbol_id(asset);
     if (!https_socket_.is_connected())
         this->make_https_connection();
     auto const request = build_rest_query(
-        "quote?symbol=" + ntwk::url_encode(asset_str), this->get_key());
+        "quote?symbol=" + ntwk::url_encode(asset_str), this->get_key_param());
     auto const no_key_request = request.substr(0, request.find("token"));
     log_status("accessing finnhub.io" + no_key_request);
     try {
@@ -93,7 +94,7 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
     if (!https_socket_.is_connected())
         this->make_https_connection();
     auto const request = build_rest_query("search?q=" + ntwk::url_encode(query),
-                                          this->get_key());
+                                          this->get_key_param());
     auto const no_key_request = request.substr(0, request.find("token"));
     log_status("accessing finnhub.io" + no_key_request);
     try {
@@ -108,8 +109,8 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
             auto const type        = (std::string)x["type"];
             auto sr                = Search_result{type, description, {}};
             if (type == "Crypto") {
-                if (is_cached(symbol_id)) {
-                    sr.asset = find_asset(symbol_id);
+                if (id_cache_.is_cached(symbol_id)) {
+                    sr.asset = id_cache_.find_asset(symbol_id);
                     result.push_back(sr);
                 }
             }
@@ -131,12 +132,11 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
 void Finnhub::subscribe(Asset const& asset)
 {
     auto const json = std::string{"{\"type\":\"subscribe\",\"symbol\":\""} +
-                      find_symbol_id(asset) + "\"}";
+                      id_cache_.find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
     log_status("Finnhub Websocket Subscribing: " + asset.exchange + ' ' +
                asset.currency.base + ' ' + asset.currency.quote);
-    log_status("subscribe json: " + json);
     try {
         ws_.write(json);
         ++subscription_count_;
@@ -151,7 +151,7 @@ void Finnhub::subscribe(Asset const& asset)
 void Finnhub::unsubscribe(Asset const& asset)
 {
     auto const json = std::string{"{\"type\":\"unsubscribe\",\"symbol\":\""} +
-                      find_symbol_id(asset) + "\"}";
+                      id_cache_.find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
     log_status("Finnhub Websocket Unsubscribing: " + asset.exchange + ' ' +
@@ -169,8 +169,11 @@ void Finnhub::unsubscribe(Asset const& asset)
 
 auto Finnhub::stream_read() -> std::vector<Price>
 {
+    if (!ws_.is_connected())
+        this->ws_connect();
     try {
-        auto prices = parse_prices(ws_json_parser().parse(ws_.read()));
+        auto prices =
+            parse_prices(ws_json_parser().parse(ws_.read()), id_cache_);
         // Remove Duplicates so up/down indicators work properly. Keep newest.
         std::stable_sort(
             std::begin(prices), std::end(prices),

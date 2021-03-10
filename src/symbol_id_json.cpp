@@ -1,5 +1,7 @@
+#include "symbol_id_json.hpp"
+
+#include <fstream>
 #include <iostream>
-#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,8 +11,10 @@
 
 #include <simdjson.h>
 
-#include "../asset.hpp"
-#include "../currency_pair.hpp"
+#include "asset.hpp"
+#include "currency_pair.hpp"
+#include "filenames.hpp"
+#include "ntwk/https_socket.hpp"
 
 namespace {
 
@@ -22,14 +26,6 @@ using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
     return parser;
 }
 
-[[nodiscard]] auto parse_crypto_symbol(std::string const& display_symbol)
-    -> crab::Currency_pair
-{
-    auto const div_pos = display_symbol.find('/');
-    return {display_symbol.substr(0, div_pos),
-            display_symbol.substr(div_pos + 1)};
-}
-
 [[nodiscard]] auto build_rest_query(std::string resource,
                                     std::string const& key) -> std::string
 {
@@ -38,6 +34,14 @@ using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
     else
         resource.push_back('&');
     return "/api/v1/" + resource + "token=" + key;
+}
+
+[[nodiscard]] auto parse_crypto_symbol(std::string const& display_symbol)
+    -> crab::Currency_pair
+{
+    auto const div_pos = display_symbol.find('/');
+    return {display_symbol.substr(0, div_pos),
+            display_symbol.substr(div_pos + 1)};
 }
 
 /// Query for list of crypto exchanges.
@@ -87,60 +91,74 @@ void append(Container_t& to, Container_t&& from)
     return '\"' + x + '\"';
 };
 
-/// Output one asset/id pair to \p os.
-void make_get_id_line(std::ostream& os,
-                      crab::Asset const& asset,
-                      std::string const& id)
+/// Write single entry of json array, id and asset.
+void to_json(std::ostream& os, std::string const& id, crab::Asset const& asset)
 {
-    os << "{{" << quote(asset.exchange) << ", {" << quote(asset.currency.base)
-       << ", " << quote(asset.currency.quote) << "}}, " << quote(id) << "},\n";
+    os << '{';
+    os << quote("i") << ':' << quote(id) << ',';
+    os << quote("x") << ':' << quote(asset.exchange) << ',';
+    os << quote("b") << ':' << quote(asset.currency.base) << ',';
+    os << quote("q") << ':' << quote(asset.currency.quote);
+    os << "}";
 }
 
-void make_get_asset_line(std::ostream& os,
-                         std::string const& id,
-                         crab::Asset const& asset)
-{
-    os << "{" << quote(id) << ", {" << quote(asset.exchange) << ", {"
-       << quote(asset.currency.base) << ", " << quote(asset.currency.quote)
-       << "}}},\n";
-}
-
-/// Query for all symbol_ids from Finnhub and write it out to given cpp file.
-void generate_finnhub_symbol_id_tables(ntwk::HTTPS_socket& sock,
-                                       std::string const& key,
-                                       std::ostream& os)
+void generate_finnhub_symbol_id_json(ntwk::HTTPS_socket& sock,
+                                     std::string const& key,
+                                     std::ostream& os)
 {
     auto ids_and_assets = std::vector<std::pair<std::string, crab::Asset>>{};
     for (std::string const& exchange : get_exchanges_list(sock, key))
         append(ids_and_assets, exchange_assets(sock, key, exchange));
 
-    os << "std::map<crab::Asset, std::string> get_id_map = {\n";
-    /// get_id_map
-    for (auto const& [id, asset] : ids_and_assets)
-        make_get_id_line(os, asset, id);
-    os << "};\n\n";
+    os << '{' << quote("data") << ":[";
+    auto div = "";
+    for (auto const& [id, asset] : ids_and_assets) {
+        os << div;
+        div = ",";
+        to_json(os, id, asset);
+    }
+    os << "]}";
+}
 
-    /// get_asset_map
-    os << "std::map<std::string, crab::Asset> get_asset_map = {\n";
-    for (auto const& [id, asset] : ids_and_assets)
-        make_get_asset_line(os, id, asset);
-    os << "};\n";
+auto make_socket_connection() -> ntwk::HTTPS_socket
+{
+    auto sock = ntwk::HTTPS_socket{};
+    sock.connect("finnhub.io");
+    return sock;
+}
+
+/// Read finnhub key, assumes it exists and is valid.
+auto read_key() -> std::string
+{
+    auto file = std::ifstream{crab::finnhub_key_filepath()};
+    auto key  = std::string{};
+    file >> key;
+    return key;
 }
 
 }  // namespace
 
-/// Generate .cpp maps of Assets and Finnhub 'symbol_id's.
-int main(int argc, char* argv[])
+namespace crab {
+void write_ids_json()
 {
-    if (argc != 2) {
-        std::cerr
-            << "Error: Finnhub Key needs to be provided at command line.\n";
-        return 1;
-    }
-    auto const key = std::string{argv[1]};
-    auto sock      = ntwk::HTTPS_socket{};
-    sock.connect("finnhub.io");
-    generate_finnhub_symbol_id_tables(sock, key, std::cout);
+    auto sock      = make_socket_connection();
+    auto const key = read_key();
+    auto file      = std::ofstream{crab::symbol_ids_json_filepath()};
+    generate_finnhub_symbol_id_json(sock, key, file);
     sock.disconnect();
-    return 0;
 }
+
+auto read_ids_json(std::filesystem::path const& filepath)
+    -> std::vector<std::pair<std::string, Asset>>
+{
+    auto doc    = json_parser().load(filepath.string());
+    auto result = std::vector<std::pair<std::string, Asset>>{};
+    for (auto const& p : doc["data"]) {
+        result.push_back({(std::string)p["i"],
+                          {(std::string)p["x"],
+                           {(std::string)p["b"], (std::string)p["q"]}}});
+    }
+    return result;
+}
+
+}  // namespace crab

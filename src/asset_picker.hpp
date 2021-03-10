@@ -191,14 +191,34 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
     {
         using ox::Trait;
         auto const div = [](ox::Glyph_string& x) {
-            auto constexpr width = 24;
+            auto constexpr width = 27;
             x.append(U'\n');
             x.append(std::u32string(width, U'─') | fg(crab::Red));
             x.append(U'\n');
         };
 
         auto info = ox::Glyph_string{};
-        info.append(U"~/Documents/crabwise/assets.txt\n" | Trait::Bold);
+
+        info.append(
+            U"Handle 𝍢 can be clicked and dragged to rearrange ordering. "
+            U"Reorder only happens when mouse moves from one handle to another "
+            U"handle.");
+
+        div(info);
+
+        info.append(U"Press 'x' to remove an asset.");
+
+        div(info);
+
+        info.append(
+            U"Search relies on the Finnhub API, best when you know exactly the "
+            U"asset you are searching for. Include the exchange, and the base "
+            U"and quote currencies, divided by a '/' for best results. Yeah, "
+            U"search result scrolling is weird.");
+
+        div(info);
+
+        info.append(U"~/Documents/crabwise/\nassets.txt\n" | Trait::Bold);
         info.append(
             U"This file contains your saved assets, it is plaintext,"
             " readable and editable.\n");
@@ -246,25 +266,6 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
         info.append(U'\n');
         info.append(U"# Comment");
 
-        div(info);
-
-        info.append(
-            U"Handle 𝍢 can be clicked and dragged to rearrange ordering. "
-            U"Reorder only happens when mouse moves from one handle to another "
-            U"handle.");
-
-        div(info);
-
-        info.append(U"Press 'x' to remove an asset.");
-
-        div(info);
-
-        info.append(
-            U"Search relies on the Finnhub API, best when you know exactly the "
-            U"asset you are searching for. Include the exchange, and the base "
-            U"and quote currencies, divided by a '/' for best results. Yeah, "
-            U"search result scrolling is weird.");
-
         tb.clear();
         tb.set_contents(info);
     }
@@ -286,7 +287,7 @@ class Asset_picker
    public:
     Asset_picker() : Base_t{{U"Stonk Selector", ox::Align::Center}}
     {
-        this->wrapped() | ox::pipe::fixed_width(26);
+        this->wrapped() | ox::pipe::fixed_width(29);
     }
 };
 

@@ -19,6 +19,7 @@
 #include "../price.hpp"
 #include "../search_result.hpp"
 #include "../stats.hpp"
+#include "../symbol_id_json.hpp"
 #include "error.hpp"
 #include "symbol_id_cache.hpp"
 
@@ -73,7 +74,8 @@ class Finnhub {
     ntwk::Websocket ws_;
     mutable ntwk::HTTPS_socket https_socket_;
     std::string key_param_;
-    int subscription_count_ = 0;
+    int subscription_count_   = 0;
+    Symbol_ID_cache id_cache_ = read_ids_json(symbol_ids_json_filepath());
 
    private:
     [[nodiscard]] static auto parse_key(std::filesystem::path const& filepath)
@@ -87,7 +89,7 @@ class Finnhub {
         return key;
     }
 
-    auto get_key() -> std::string const&
+    auto get_key_param() -> std::string const&
     {
         if (key_param_.empty()) {
             try {
@@ -104,7 +106,7 @@ class Finnhub {
     {
         log_status("Websocket connect: ws.finnhub.io");
         try {
-            ws_.connect("ws.finnhub.io", "/?" + this->get_key());
+            ws_.connect("ws.finnhub.io", "/?" + this->get_key_param());
         }
         catch (std::exception const& e) {
             log_error("Finnhub Websocket failed to connect: " +

@@ -70,5 +70,11 @@ inline auto log_filepath() -> std::filesystem::path
     return crabwise_data_directory() / "crabwise.log";
 }
 
+/// Return path to ids.json file, file might not exist yet.
+inline auto symbol_ids_json_filepath() -> std::filesystem::path
+{
+    return crabwise_data_directory() / "ids.json";
+}
+
 }  // namespace crab
 #endif  // CRAB_FILENAMES_HPP

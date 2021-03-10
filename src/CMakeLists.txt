@@ -1,10 +1,18 @@
 cmake_minimum_required(VERSION 3.14)
 
-add_subdirectory(markets)
+add_subdirectory(markets EXCLUDE_FROM_ALL)
 
 add_executable(crabwise
     log.cpp
+    symbol_id_json.cpp
     crabwise.main.cpp
 )
 
-target_link_libraries(crabwise PRIVATE TermOx markets)
+target_link_libraries(crabwise PRIVATE TermOx markets ntwk simdjson)
+
+include(GNUInstallDirs)
+install(TARGETS crabwise
+        RUNTIME
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        CONFIGURATIONS Release
+)
