@@ -49,19 +49,6 @@ jobs:
           brew install boost
           mkdir build && cd build
           cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -DOPENSSL_LIBRARIES=/usr/local/opt/openssl/lib -DCMAKE_BUILD_TYPE=Release .. && make crabwise
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
-          prerelease: false
-          title: "MacOS 10.15 Build"
-      - uses: "svenstaro/upload-release-action@v2"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          file: ./build/src/crabwise
-          asset_name: crabwise
-          tag: "latest"
-          overwrite: true
 
   # MacOS-10.15 GCC
   clang-build-MacOS10-gcc10:
