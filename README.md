@@ -24,7 +24,7 @@ cd CrabWise/
 mkdir build && cd build/
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make crabwise    # Build the app locally
-make install     # Optional install to gnu default directories(TODO - not yet)
+make install     # Optional install to gnu default directories
 ```
 
 ## Instructions
@@ -45,11 +45,13 @@ files here:
 
 - `crabwise.log`: Status and Error logs, if having network issues, look here.
 
+- `ids.json`: Created on first run, contains symbol ids used to fetch data.
+
 Once the app is up and running, you can search for assets by expanding the
 sidebar and using the search bar. Click on an asset to add it, x to delete it.
 
-You can then type in the quantity of the asset you own under the `Quantity`
-column, which will update the `Value` column and will be stored in `assets.txt`.
+You can type in the quantity of the asset you own under the `Quantity` column,
+which will update the `Value` column.
 
 Click on the `Save` button in the bottom right corner. This will save the
 current state of the app, so it can be reloaded later.
@@ -61,7 +63,7 @@ comment, has to be on its own line. Exchanges can be listed multiple times, the
 order listed is the order read into the program. Quantities are optional. Any
 number of whitespace is used a separator. Base currency is listed first, then
 the currency it is quoted in on the exchange. Stocks are listed with the literal
-'Stocks' header.
+'Stock' header.
 
 ```txt
 Coinbase:
