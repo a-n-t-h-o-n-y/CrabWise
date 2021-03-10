@@ -80,7 +80,7 @@ class Finnhub {
    private:
     [[nodiscard]] static auto parse_key(fs::path const& filepath) -> std::string
     {
-        auto file = std::ifstream{filepath};
+        auto file = std::ifstream{filepath.string()};
         auto key  = std::string{};
         file >> key;
         if (key.empty())

@@ -131,7 +131,7 @@ auto make_socket_connection() -> ntwk::HTTPS_socket
 /// Read finnhub key, assumes it exists and is valid.
 auto read_key() -> std::string
 {
-    auto file = std::ifstream{crab::finnhub_key_filepath()};
+    auto file = std::ifstream{crab::finnhub_key_filepath().string()};
     auto key  = std::string{};
     file >> key;
     return key;
@@ -144,7 +144,7 @@ void write_ids_json()
 {
     auto sock      = make_socket_connection();
     auto const key = read_key();
-    auto file      = std::ofstream{crab::symbol_ids_json_filepath()};
+    auto file      = std::ofstream{crab::symbol_ids_json_filepath().string()};
     generate_finnhub_symbol_id_json(sock, key, file);
     sock.disconnect();
 }

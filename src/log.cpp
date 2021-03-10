@@ -25,7 +25,8 @@ namespace {
 [[nodiscard]] auto file() -> std::ofstream&
 {
     static auto file_ = [] {
-        auto fs = std::ofstream{crab::log_filepath(), std::ios_base::app};
+        auto fs =
+            std::ofstream{crab::log_filepath().string(), std::ios_base::app};
         fs << '\n' << timestamp() << "--------------------------------\n";
         return fs;
     }();

@@ -103,7 +103,7 @@ class App_space
     {
         auto const filepath = assets_filepath();
         {
-            auto file = std::ofstream{filepath};
+            auto file = std::ofstream{filepath.string()};
             file << generate_save_string(ticker_list);
         }
         status_bar.set_status("Snapshot saved to: " + filepath.string());
@@ -218,7 +218,7 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         if (!fs::exists(filepath))
             return {};
         auto result           = std::vector<std::pair<Asset, double>>{};
-        auto file             = std::ifstream{filepath};
+        auto file             = std::ifstream{filepath.string()};
         auto line             = std::string{};
         auto current_exchange = std::string{};
         while (std::getline(file, line, '\n')) {

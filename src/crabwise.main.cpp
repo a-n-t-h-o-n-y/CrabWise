@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
         auto const key_path = crab::finnhub_key_filepath();
         if (argc > 1) {
             auto key  = std::string_view{argv[1]};
-            auto file = std::ofstream{key_path};
+            auto file = std::ofstream{key_path.string()};
             file << key;
         }
         if (!crab::fs::exists(key_path)) {
