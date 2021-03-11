@@ -86,7 +86,10 @@ class Quantity_edit : public ox::Textbox {
     void initialize(double value)
     {
         auto display = std::to_string(value);
-        format_money(display);
+        if (value == 0.)
+            display = "0";
+        else
+            format_money(display);
         this->set_contents(display);
         quantity_updated.emit(value);
         value_ = value;
