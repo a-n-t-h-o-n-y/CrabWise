@@ -78,13 +78,14 @@ class Result_subgroup_btns
 };
 
 class Results_subgroup
-    : public ox::Passive<
-          ox::VPair<ox::HLabel,
-                    ox::HPair<ox::VScrollbar, Result_subgroup_btns>>> {
+    : public ox::VPair<ox::HLabel,
+                       ox::HPair<ox::VScrollbar,
+                                 ox::VPair<Result_subgroup_btns, ox::Widget>>> {
    public:
     ox::HLabel& label          = this->first;
     ox::VScrollbar& scrollbar  = this->second.first;
-    Result_subgroup_btns& btns = this->second.second;
+    Result_subgroup_btns& btns = this->second.second.first;
+    ox::Widget& buffer         = this->second.second.second;
 
    public:
     sl::Signal<void(Asset const&)>& selected = btns.selected;
@@ -93,10 +94,9 @@ class Results_subgroup
     Results_subgroup()
     {
         link(scrollbar, btns);
+        buffer.install_event_filter(scrollbar);
         label | ox::Trait::Bold | ox::Trait::Underline |
             ox::pipe::align_center();
-        btns.height_policy.policy_updated.connect(
-            [this] { this->second.height_policy = btns.height_policy; });
     }
 
    public:
@@ -108,8 +108,7 @@ class Results_subgroup
     void clear_results() { btns.clear_results(); }
 };
 
-class Search_results_groups
-    : public ox::Passive<ox::VArray<Results_subgroup, 2>> {
+class Search_results : public ox::VArray<Results_subgroup, 2> {
    public:
     sl::Signal<void(Asset const&)> selected;
 
@@ -118,7 +117,7 @@ class Search_results_groups
     Results_subgroup& stocks = this->get<1>();
 
    public:
-    Search_results_groups()
+    Search_results()
     {
         crypto.selected.connect(
             [this](Asset const& a) { this->selected.emit(a); });
@@ -144,26 +143,6 @@ class Search_results_groups
         crypto.clear_results();
         stocks.clear_results();
     }
-};
-
-class Search_results : public ox::VPair<Search_results_groups, ox::Widget> {
-   public:
-    Search_results_groups& groups = this->first;
-    ox::Widget& buffer            = this->second;
-
-   public:
-    sl::Signal<void(Asset const&)>& selected = groups.selected;
-
-   public:
-    Search_results() { buffer.install_event_filter(groups.stocks.scrollbar); }
-
-   public:
-    void add_result(Search_result const& search_result)
-    {
-        groups.add_result(search_result);
-    }
-
-    void clear_results() { groups.clear_results(); }
 };
 
 class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
@@ -213,8 +192,7 @@ class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
         info.append(
             U"Search relies on the Finnhub API, best when you know exactly the "
             U"asset you are searching for. Include the exchange, and the base "
-            U"and quote currencies, divided by a '/' for best results. Yeah, "
-            U"search result scrolling is weird.");
+            U"and quote currencies, divided by a '/' for best results.");
 
         div(info);
 
@@ -285,7 +263,7 @@ class Asset_picker
     Info_box& info_box             = this->wrapped().get<2>();
 
    public:
-    Asset_picker() : Base_t{{U"Stonk Selector", ox::Align::Center}}
+    Asset_picker() : Base_t{{U"Asset Finder", ox::Align::Center}}
     {
         this->wrapped() | ox::pipe::fixed_width(29);
     }
