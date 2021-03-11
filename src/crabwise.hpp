@@ -17,6 +17,7 @@
 #include "filesystem.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
+#include "termox/widget/pipe.hpp"
 #include "ticker_list.hpp"
 
 namespace crab {
@@ -61,22 +62,26 @@ class Status_bar : public ox::HPair<Status_box, ox::Button> {
 class App_space
     : public ox::HTuple<
           Asset_picker,
-          ox::VTuple<Column_labels,
+          ox::VTuple<ox::Widget,
+                     Column_labels,
                      ox::HTuple<ox::VTuple<Line, Ticker_list, ox::Widget>,
                                 ox::VScrollbar>,
                      Status_bar>> {
    public:
     Asset_picker& asset_picker = this->get<0>();
-    Ticker_list& ticker_list   = this->get<1>().get<1>().get<0>().get<1>();
-    ox::Widget& buffer         = this->get<1>().get<1>().get<0>().get<2>();
-    Status_bar& status_bar     = this->get<1>().get<2>();
-    ox::VScrollbar& scrollbar  = this->get<1>().get<1>().get<1>();
+    ox::Widget& top_line       = this->get<1>().get<0>();
+    Ticker_list& ticker_list   = this->get<1>().get<2>().get<0>().get<1>();
+    ox::Widget& bottom_buffer  = this->get<1>().get<2>().get<0>().get<2>();
+    Status_bar& status_bar     = this->get<1>().get<3>();
+    ox::VScrollbar& scrollbar  = this->get<1>().get<2>().get<1>();
 
    public:
     App_space()
     {
         link(scrollbar, ticker_list);
-        buffer.install_event_filter(scrollbar);
+        bottom_buffer.install_event_filter(scrollbar);
+
+        top_line | ox::pipe::fixed_height(1);
 
         asset_picker.search_results.selected.connect(
             [this](Asset const& asset) {
