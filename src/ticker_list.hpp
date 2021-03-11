@@ -34,19 +34,22 @@ class Div : public ox::Widget {
     }
 };
 
-class Asset_name : public ox::HArray<ox::HLabel, 3> {
+class Asset_name : public ox::HArray<ox::HLabel, 4> {
    public:
-    ox::HLabel& exchange = this->get<0>();
-    ox::HLabel& base     = this->get<1>();
-    ox::HLabel& quote    = this->get<2>();
+    ox::HLabel& buffer   = this->get<0>();
+    ox::HLabel& exchange = this->get<1>();
+    ox::HLabel& base     = this->get<2>();
+    ox::HLabel& quote    = this->get<3>();
 
    public:
     Asset_name()
     {
-        exchange | ox::pipe::fixed_width(10);
-        base | ox::pipe::fixed_width(6) | ox::Trait::Bold;
+        using namespace ox::pipe;
+        buffer | fixed_width(1);
+        exchange | fixed_width(10);
+        base | fixed_width(6) | ox::Trait::Bold;
         quote | ox::Trait::Dim;
-        *this | ox::pipe::fixed_width(21);
+        *this | fixed_width(21);
     }
 
    public:
@@ -324,11 +327,12 @@ class Listings : public ox::HTuple<Hamburger,
                                    Quantity_edit,
                                    ox::Widget,
                                    Price_display,
+                                   Div,
                                    Remove_btn> {
    public:
     Hamburger& hamburger            = this->get<0>();
     ox::Widget& buffer_1            = this->get<1>();
-    Div& div                        = this->get<2>();
+    Div& div1                       = this->get<2>();
     Asset_name& name                = this->get<3>();
     Indicator& indicator            = this->get<4>();
     Price_display& last_price       = this->get<5>();
@@ -339,7 +343,8 @@ class Listings : public ox::HTuple<Hamburger,
     Quantity_edit& quantity         = this->get<10>();
     ox::Widget& buffer_4            = this->get<11>();
     Price_display& value            = this->get<12>();
-    Remove_btn& remove_btn          = this->get<13>();
+    Div& div2                       = this->get<13>();
+    Remove_btn& remove_btn          = this->get<14>();
 
    public:
     Listings()
@@ -601,8 +606,8 @@ class Column_labels : public ox::HArray<ox::HLabel, 11> {
         using namespace ox::pipe;
         *this | fixed_height(1);
         buffer_1 | fixed_width(5);
-        name.set_text(U"Asset" | ox::Trait::Bold);
-        name | fixed_width(21);
+        name.set_text(U" Asset" | ox::Trait::Bold);
+        name | fixed_width(22);
         buffer_2 | fixed_width(2);
         last_price.set_text(U"   Last Price" | ox::Trait::Bold);
         last_price | fixed_width(14);
