@@ -139,6 +139,8 @@ class Quantity_edit : public ox::Textbox {
     }
 
    private:
+    /// Generate the string that will be made once the char is commited.
+    /** Used for validation before sending the char to the Textbox base class */
     auto generate_string(char c) -> std::string
     {
         auto result = this->contents().str();
@@ -158,6 +160,8 @@ class Quantity_edit : public ox::Textbox {
     {
         input.erase(std::remove(std::begin(input), std::end(input), ','),
                     std::end(input));
+        if (input.empty() || input == ".")
+            return 0.;
         auto count = std::size_t{0};
         try {
             auto const result = std::stod(input, &count);
