@@ -17,6 +17,7 @@
 #include "price.hpp"
 #include "stats.hpp"
 #include "termox/system/key.hpp"
+#include "termox/widget/pipe.hpp"
 
 namespace crab {
 
@@ -91,8 +92,10 @@ class Quantity_edit : public ox::Textbox {
         auto display = std::to_string(value);
         if (value == 0.)
             display = "0";
-        else
-            format_money(display);
+        else {
+            format_decimal_zeros(display);
+            insert_thousands_separators(display);
+        }
         this->set_contents(display);
         quantity_updated.emit(value);
         value_ = value;
@@ -172,96 +175,143 @@ class Quantity_edit : public ox::Textbox {
     double value_ = 0;
 };
 
-class Price_display : public ox::HArray<ox::HLabel, 2> {
+/// Settable as a string abbriviation, displayed in its symbolic representation.
+class Currency_display : public ox::HLabel {
    public:
-    Price_display()
+    Currency_display(std::string x = "")
     {
         using namespace ox::pipe;
-        symbol | fixed_width(3) | align_center();
+        *this | fixed_width(3) | fixed_height(1) | align_center();
+        if (!x.empty())
+            this->set(std::move(x));
     }
 
    public:
-    /// Set the currency symbol, x is the all caps abriviation.
-    void set_currency(std::string const& x) { symbol.set_text(to_symbol(x)); }
-
-    void set_price(std::string v)
+    /// Set the currency to display, \p x is a string abbriviation.
+    /** Uses an underscore if no symbol found for the given currency. */
+    void set(std::string x)
     {
-        amount_ = std::stod(v);
-        format_money(v);
-        value.set_text(v);
+        currency_ = std::move(x);
+        this->ox::HLabel::set_text(currency_to_symbol(currency_));
     }
 
-    auto amount() const -> double { return amount_; }
+    /// Return the string abbriviation currency was set with.
+    [[nodiscard]] auto currency() const -> std::string const&
+    {
+        return currency_;
+    }
 
+   private:
+    std::string currency_;
+};
+
+/// Displays an amount passed in as a string or double.
+/** Inserts thousands separators and formats decimal zeros if needed. */
+class Amount_display : public ox::HLabel {
    public:
-    ox::HLabel& symbol = this->get<0>();
-    ox::HLabel& value  = this->get<1>();
-
-   private:
-    double amount_ = 0.;
-
-   private:
-    [[nodiscard]] static auto to_symbol(std::string const& x)
-        -> ox::Glyph_string
+    void set(double amount)
     {
-        if (x == "USD")
-            return U"$";
-        if (x == "ETH")
-            return U"Ξ";
-        if (x == "BTC")
-            return U"₿";
-        if (x == "XBT")
-            return U"₿";
-        if (x == "EUR")
-            return U"€";
-        if (x == "GBP")
-            return U"£";
-        if (x == "DAI")
-            return U"◈";
-        if (x == "USDC")
-            return U"ᐥC";
-        if (x == "USDT")
-            return U"₮";
-        if (x == "XRP")
-            return U"✕";
-        if (x == "BCH")
-            return U"Ƀ";
-        if (x == "BSV")
-            return U"Ɓ";
-        if (x == "LTC")
-            return U"Ł";
-        if (x == "EOS")
-            return U"ε";
-        if (x == "ADA")
-            return U"₳";
-        if (x == "XTZ")
-            return U"ꜩ";
-        if (x == "XMR")
-            return U"ɱ";
-        if (x == "ETC")
-            return U"ξ";
-        if (x == "MKR")
-            return U"Μ";
-        if (x == "ZEC")
-            return U"ⓩ";
-        if (x == "DOGE")
-            return U"Ð";
-        if (x == "REP")
-            return U"Ɍ";
-        if (x == "REPV2")
-            return U"Ɍ";
-        if (x == "STEEM")
-            return U"ȿ";
-        if (x == "JPY")
-            return U"¥";
-        if (x == "CAD")
-            return U"$";
-        if (x == "CHF")
-            return U"₣";
-        if (x == "AUD")
-            return U"$";
-        return "_";
+        double_ = amount;
+        string_ = std::to_string(amount);
+        format_decimal_zeros(string_);
+        insert_thousands_separators(string_);
+        this->ox::HLabel::set_text(string_);
     }
+
+    void set(std::string amount)
+    {
+        string_ = std::move(amount);
+        double_ = std::stod(string_);
+        format_decimal_zeros(string_);
+        insert_thousands_separators(string_);
+        this->ox::HLabel::set_text(string_);
+    }
+
+    /// Return set value as a double.
+    [[nodiscard]] auto as_double() const -> double { return double_; }
+
+    /// Return set value as it was passed in, without formatting.
+    [[nodiscard]] auto as_string() const -> std::string const&
+    {
+        return string_;
+    }
+
+   private:
+    double double_;
+    std::string string_;
+};
+
+class Price_display : public ox::HPair<Currency_display, Amount_display> {
+   public:
+    Currency_display& currency = this->first;
+    Amount_display& amount     = this->second;
+};
+
+/// Displays an amount passed in as a string or double, aligns on decimal place.
+/** Inserts thousands separators and formats decimal zeros if needed, \p offset
+ *  is used for decimal alignment, if \p hundredths_round is true, rounds. */
+class Aligned_amount_display : public ox::HLabel {
+   public:
+    void set(double amount)
+    {
+        double_ = amount;
+        string_ = std::to_string(amount);
+        format_decimal_zeros(string_);
+        insert_thousands_separators(string_);
+        if (round_hundredths_)
+            string_ = hundredths_round(string_);
+        string_ = align_decimal(string_, offset_);
+        this->ox::HLabel::set_text(string_);
+    }
+
+    void set(std::string amount)
+    {
+        string_ = std::move(amount);
+        double_ = std::stod(string_);
+        format_decimal_zeros(string_);
+        insert_thousands_separators(string_);
+        if (round_hundredths_)
+            string_ = hundredths_round(string_);
+        string_ = align_decimal(string_, offset_);
+        this->ox::HLabel::set_text(string_);
+    }
+
+    void set_offset(std::size_t x)
+    {
+        offset_ = x;
+        if (!string_.empty())
+            this->set(string_);
+    }
+
+    void round_to_hundredths(bool x)
+    {
+        round_hundredths_ = x;
+        if (!string_.empty())
+            this->set(string_);
+    }
+
+    /// Return set value as a double.
+    [[nodiscard]] auto as_double() const -> double { return double_; }
+
+    /// Return set value as it was passed in, without formatting.
+    [[nodiscard]] auto as_string() const -> std::string const&
+    {
+        return string_;
+    }
+
+   private:
+    double double_;
+    std::string string_;
+    std::size_t offset_    = 0;
+    bool round_hundredths_ = false;
+};
+
+/// Aligned price display and potential rounding to hundredths.
+class Aligned_price_display
+    : public ox::HPair<Currency_display, Aligned_amount_display> {
+   public:
+    Currency_display& currency     = this->first;
+    Aligned_amount_display& amount = this->second;
 };
 
 class Percent_display : public ox::HArray<ox::HLabel, 2> {
@@ -326,7 +376,7 @@ class Listings : public ox::HTuple<Hamburger,
                                    ox::Widget,
                                    Quantity_edit,
                                    ox::Widget,
-                                   Price_display,
+                                   Aligned_price_display,
                                    Div,
                                    Remove_btn> {
    public:
@@ -342,7 +392,7 @@ class Listings : public ox::HTuple<Hamburger,
     ox::Widget& buffer_3            = this->get<9>();
     Quantity_edit& quantity         = this->get<10>();
     ox::Widget& buffer_4            = this->get<11>();
-    Price_display& value            = this->get<12>();
+    Aligned_price_display& value    = this->get<12>();
     Div& div2                       = this->get<13>();
     Remove_btn& remove_btn          = this->get<14>();
 
@@ -400,17 +450,21 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     Ticker(Asset asset, Stats stats, double quantity)
         : asset_{asset}, last_price_{stats.current_price}
     {
-        listings.last_price.set_currency(asset.currency.quote);
-        listings.opening_price.set_currency(asset.currency.quote);
-        listings.value.set_currency(asset.currency.quote);
+        listings.last_price.currency.set(asset.currency.quote);
+        listings.opening_price.currency.set(asset.currency.quote);
+        listings.value.currency.set(asset.currency.quote);
+        if (is_USD_like(asset_.currency.quote)) {
+            listings.value.amount.round_to_hundredths(true);
+            listings.value.amount.set_offset(8);
+        }
         listings.name.set(asset);
 
-        listings.last_price.set_price(std::to_string(stats.current_price));
+        listings.last_price.amount.set(stats.current_price);
         this->recalculate_percent_change();
 
         listings.quantity.initialize(quantity);
         listings.quantity.quantity_updated.connect([this](double quant) {
-            this->update_value(quant, listings.last_price.amount());
+            this->update_value(quant, listings.last_price.amount.as_double());
         });
 
         this->update_opening_price(stats.opening_price);
@@ -419,7 +473,7 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
    public:
     void update_last_price(std::string const& value)
     {
-        listings.last_price.set_price(value);
+        listings.last_price.amount.set(value);
         this->recalculate_percent_change();
         auto count       = std::size_t{0};
         auto const newer = std::stod(value, &count);
@@ -429,14 +483,14 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         else if (newer < last_price_)
             listings.indicator.emit_negative();
         this->update_value(listings.quantity.quantity(),
-                           listings.last_price.amount());
+                           listings.last_price.amount.as_double());
         last_price_ = newer;
     }
 
     void update_opening_price(double value)
     {
         opening_price_ = value;
-        listings.opening_price.set_price(std::to_string(value));
+        listings.opening_price.amount.set(value);
         this->recalculate_percent_change();
     }
 
@@ -465,8 +519,7 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
     void update_value(double quantity, double last_price)
     {
-        listings.value.set_price(
-            std::to_string(calc_value(quantity, last_price)));
+        listings.value.amount.set(calc_value(quantity, last_price));
     }
 
    private:
@@ -540,8 +593,8 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     }
 
     /// Return list of all Assets that can be added as Tickers.
-    /// Make request for async https request for Search_results.
-    /** markets_.search_results_recieved emitted when finished. */
+    /** Makes async request via https for Search_results.
+     *  markets_.search_results_recieved emitted when finished. */
     [[nodiscard]] auto request_search(std::string const& query)
     {
         markets_.request_search(query);
@@ -550,7 +603,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    protected:
     auto enable_event() -> bool override
     {
-        // So loop is not launched before user input event loop.
+        // So that loop is not launched before user input event loop.
         markets_.launch_streams();
         return Base_t::enable_event();
     }
