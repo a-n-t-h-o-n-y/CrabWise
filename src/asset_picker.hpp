@@ -149,122 +149,16 @@ class Search_results : public ox::VArray<Results_subgroup, 2> {
     }
 };
 
-class Info_box : public ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>> {
-   private:
-    using Base_t = ox::VAccordion<ox::HPair<ox::VScrollbar, ox::Textbox>>;
-
-   public:
-    ox::VScrollbar& scrollbar = this->wrapped().first;
-    ox::Textbox& textbox      = this->wrapped().second;
-
-   public:
-    Info_box() : Base_t{{U"About 🦀", ox::Align::Center}}
-    {
-        link(scrollbar, textbox);
-
-        this->wrapped() | ox::pipe::fixed_height(12);
-
-        textbox.disable_input();
-        textbox | ox::pipe::no_focus();
-        add_info(textbox);
-    }
-
-   private:
-    static void add_info(ox::Textbox& tb)
-    {
-        using ox::Trait;
-        auto const div = [](ox::Glyph_string& x) {
-            auto constexpr width = 27;
-            x.append(U'\n');
-            x.append(std::u32string(width, U'─') | fg(crab::Red));
-            x.append(U'\n');
-        };
-
-        auto info = ox::Glyph_string{};
-
-        info.append(
-            U"Handle 𝍢 can be clicked and dragged to rearrange ordering. "
-            U"Reorder only happens when mouse moves from one handle to another "
-            U"handle.");
-
-        div(info);
-
-        info.append(U"Press 'x' to remove an asset.");
-
-        div(info);
-
-        info.append(
-            U"Search relies on the Finnhub API, best when you know exactly the "
-            U"asset you are searching for. Include the exchange, and the base "
-            U"and quote currencies, divided by a '/' for best results.");
-
-        div(info);
-
-        info.append(U"~/Documents/crabwise/\nassets.txt\n" | Trait::Bold);
-        info.append(
-            U"This file contains your saved assets, it is plaintext,"
-            " readable and editable.\n");
-        info.append(U"Format:\n");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Exchange");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U":\n");
-        info.append(U"  ");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Base");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U' ');
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Quote");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U' ');
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Count");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U'\n');
-        info.append(U"  ");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Base");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U' ');
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Quote");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U'\n');
-        info.append(U"Stock:\n");
-        info.append(U"  ");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Symbol");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U' ');
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Count");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U'\n');
-        info.append(U"  ");
-        info.append(U'[' | fg(crab::Gray));
-        info.append(U"Symbol");
-        info.append(U']' | fg(crab::Gray));
-        info.append(U'\n');
-        info.append(U"# Comment");
-
-        tb.clear();
-        tb.set_contents(info);
-    }
-};
-
 class Asset_picker
-    : public ox::HAccordion<ox::VTuple<Search_input, Search_results, Info_box>,
+    : public ox::HAccordion<ox::VTuple<Search_input, Search_results>,
                             ox::Bar_position::Last> {
    private:
-    using Base_t =
-        ox::HAccordion<ox::VTuple<Search_input, Search_results, Info_box>,
-                       ox::Bar_position::Last>;
+    using Base_t = ox::HAccordion<ox::VTuple<Search_input, Search_results>,
+                                  ox::Bar_position::Last>;
 
    public:
     Search_input& search_input     = this->wrapped().get<0>();
     Search_results& search_results = this->wrapped().get<1>();
-    Info_box& info_box             = this->wrapped().get<2>();
 
    public:
     Asset_picker() : Base_t{{U"Asset Finder", ox::Align::Center}}
