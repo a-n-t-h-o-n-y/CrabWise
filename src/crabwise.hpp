@@ -92,6 +92,7 @@ class App_space
         ticker_list.search_results_received.connect(
             [this](std::vector<Search_result> const& results) {
                 asset_picker.search_results.clear_results();
+                asset_picker.search_input.stop_spinner();
                 for (auto const& search_result : results)
                     asset_picker.search_results.add_result(search_result);
             });

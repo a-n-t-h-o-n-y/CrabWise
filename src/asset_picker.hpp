@@ -29,7 +29,6 @@ class Search_input
         button | label(U" Search" | ox::Trait::Bold) | fixed_width(8) |
             bg(crab::Light_gray) | fg(crab::Background);
         spinner | bg(crab::Almost_bg);
-        spinner.start();
         search_field | bg(crab::Almost_bg);
 
         search_field.edit_finished.connect(
@@ -37,7 +36,12 @@ class Search_input
         button.pressed.connect([this] {
             this->search_request(this->search_field.contents().str());
         });
+
+        search_request.connect([this](auto const&) { spinner.start(); });
     }
+
+   public:
+    void stop_spinner() { spinner.stop(); }
 };
 
 class Asset_btn : public ox::HThin_button {
