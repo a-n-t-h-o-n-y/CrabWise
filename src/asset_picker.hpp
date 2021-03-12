@@ -5,6 +5,7 @@
 #include <termox/termox.hpp>
 
 #include "asset.hpp"
+#include "line.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
 
@@ -82,14 +83,17 @@ class Result_subgroup_btns
 };
 
 class Results_subgroup
-    : public ox::VPair<ox::HLabel,
-                       ox::HPair<ox::VScrollbar,
-                                 ox::VPair<Result_subgroup_btns, ox::Widget>>> {
+    : public ox::VTuple<
+          ox::HLabel,
+          Line,
+          ox::HPair<ox::VScrollbar,
+                    ox::VPair<Result_subgroup_btns, ox::Widget>>> {
    public:
-    ox::HLabel& label          = this->first;
-    ox::VScrollbar& scrollbar  = this->second.first;
-    Result_subgroup_btns& btns = this->second.second.first;
-    ox::Widget& buffer         = this->second.second.second;
+    ox::HLabel& label          = this->get<0>();
+    Line& line                 = this->get<1>();
+    ox::VScrollbar& scrollbar  = this->get<2>().first;
+    Result_subgroup_btns& btns = this->get<2>().second.first;
+    ox::Widget& buffer         = this->get<2>().second.second;
 
    public:
     sl::Signal<void(Asset const&)>& selected = btns.selected;
@@ -99,8 +103,7 @@ class Results_subgroup
     {
         link(scrollbar, btns);
         buffer.install_event_filter(scrollbar);
-        label | ox::Trait::Bold | ox::Trait::Underline |
-            ox::pipe::align_center();
+        label | ox::Trait::Bold | ox::pipe::align_center();
     }
 
    public:
@@ -128,9 +131,7 @@ class Search_results : public ox::VArray<Results_subgroup, 2> {
         stocks.selected.connect(
             [this](Asset const& a) { this->selected.emit(a); });
         crypto.label.set_text(U"Crypto");
-        crypto.label | fg(crab::Light_gray);
         stocks.label.set_text(U"Stocks");
-        stocks.label | fg(crab::Light_gray);
     }
 
    public:

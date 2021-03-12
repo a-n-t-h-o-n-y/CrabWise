@@ -5,8 +5,8 @@ namespace crab {
 
 /// Stats about an Asset.
 struct Stats {
-    double current_price;
-    double opening_price;
+    double last_price;
+    double last_close;
 };
 
 }  // namespace crab

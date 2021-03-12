@@ -13,6 +13,7 @@
 
 #include "asset.hpp"
 #include "format_money.hpp"
+#include "line.hpp"
 #include "markets/markets.hpp"
 #include "palette.hpp"
 #include "price.hpp"
@@ -246,10 +247,14 @@ class Amount_display : public ox::HLabel {
     std::string string_;
 };
 
-class Price_display : public ox::HPair<Currency_display, Amount_display> {
-   public:
+struct Price_display : ox::HPair<Currency_display, Amount_display> {
     Currency_display& currency = this->first;
     Amount_display& amount     = this->second;
+};
+
+struct Price_edit : ox::HPair<Currency_display, Quantity_edit> {
+    Currency_display& currency = this->first;
+    Quantity_edit& amount      = this->second;
 };
 
 /// Displays an amount passed in as a string or double, aligns on decimal place.
@@ -260,26 +265,17 @@ class Aligned_amount_display : public ox::HLabel {
     void set(double amount)
     {
         double_ = amount;
-        string_ = std::to_string(amount);
+        if (round_hundredths_)
+            string_ = round_and_to_string(amount, 2);
+        else
+            string_ = std::to_string(amount);
         format_decimal_zeros(string_);
         insert_thousands_separators(string_);
-        if (round_hundredths_)
-            string_ = hundredths_round(string_);
         string_ = align_decimal(string_, offset_);
         this->ox::HLabel::set_text(string_);
     }
 
-    void set(std::string amount)
-    {
-        string_ = std::move(amount);
-        double_ = std::stod(string_);
-        format_decimal_zeros(string_);
-        insert_thousands_separators(string_);
-        if (round_hundredths_)
-            string_ = hundredths_round(string_);
-        string_ = align_decimal(string_, offset_);
-        this->ox::HLabel::set_text(string_);
-    }
+    void set(std::string amount) { this->set(std::stod(amount)); }
 
     void set_offset(std::size_t x)
     {
@@ -327,11 +323,10 @@ class Percent_display : public ox::HArray<ox::HLabel, 2> {
         value | align_right();
         symbol | fixed_width(3) | align_center();
         symbol.set_text(U"%");
-        *this | fixed_width(18);
     }
 
    public:
-    void set_percent(double x) { value.set_text(std::to_string(x)); }
+    void set_percent(double x) { value.set_text(round_and_to_string(x, 2)); }
 
    public:
     ox::HLabel& value  = this->get<0>();
@@ -382,6 +377,8 @@ class Listings : public ox::HTuple<Hamburger,
                                    Quantity_edit,
                                    ox::Widget,
                                    Aligned_price_display,
+                                   ox::Widget,
+                                   Price_edit,
                                    Div,
                                    Remove_btn> {
    public:
@@ -393,13 +390,15 @@ class Listings : public ox::HTuple<Hamburger,
     Price_display& last_price       = this->get<5>();
     Percent_display& percent_change = this->get<6>();
     ox::Widget& buffer_2            = this->get<7>();
-    Price_display& opening_price    = this->get<8>();
+    Price_display& last_close       = this->get<8>();
     ox::Widget& buffer_3            = this->get<9>();
     Quantity_edit& quantity         = this->get<10>();
     ox::Widget& buffer_4            = this->get<11>();
     Aligned_price_display& value    = this->get<12>();
-    Div& div2                       = this->get<13>();
-    Remove_btn& remove_btn          = this->get<14>();
+    ox::Widget& buffer_5            = this->get<13>();
+    Price_edit& cost_basis          = this->get<14>();
+    Div& div2                       = this->get<15>();
+    Remove_btn& remove_btn          = this->get<16>();
 
    public:
     Listings()
@@ -407,19 +406,21 @@ class Listings : public ox::HTuple<Hamburger,
         using namespace ox::pipe;
         *this | fixed_height(1);
         buffer_1 | fixed_width(1);
-        last_price | fixed_width(14);
+        last_price | fixed_width(12);
+        percent_change | fixed_width(12);
         buffer_2 | fixed_width(2);
-        opening_price | fixed_width(16);
+        last_close | fixed_width(13);
         buffer_3 | fixed_width(3);
         quantity | fixed_width(12);
         buffer_4 | fixed_width(2);
+        value | fixed_width(13);
+        buffer_5 | fixed_width(1);
     }
 
    public:
     [[nodiscard]] auto current_stats() const -> Stats
     {
-        return {last_price.amount.as_double(),
-                opening_price.amount.as_double()};
+        return {last_price.amount.as_double(), last_close.amount.as_double()};
     }
 };
 
@@ -437,15 +438,6 @@ class Curve : public ox::Widget {
     }
 };
 
-class Line : public ox::Widget {
-   public:
-    Line()
-    {
-        *this | ox::pipe::wallpaper(U'─' | fg(crab::Gray)) |
-            ox::pipe::fixed_height(1);
-    }
-};
-
 class Divider : public ox::HTuple<Empty, Curve, Line> {
    public:
     Divider() { *this | ox::pipe::fixed_height(1); }
@@ -460,18 +452,18 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
    public:
     Ticker(Asset asset, Stats stats, double quantity)
-        : asset_{asset}, last_price_{stats.current_price}
+        : asset_{asset}, last_price_{stats.last_price}
     {
         listings.last_price.currency.set(asset.currency.quote);
-        listings.opening_price.currency.set(asset.currency.quote);
+        listings.last_close.currency.set(asset.currency.quote);
         listings.value.currency.set(asset.currency.quote);
         if (is_USD_like(asset_.currency.quote)) {
             listings.value.amount.round_to_hundredths(true);
-            listings.value.amount.set_offset(8);
+            listings.value.amount.set_offset(6);
         }
         listings.name.set(asset);
 
-        listings.last_price.amount.set(stats.current_price);
+        listings.last_price.amount.set(stats.last_price);
         this->recalculate_percent_change();
 
         listings.quantity.initialize(quantity);
@@ -479,7 +471,9 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
             this->update_value(quant, listings.last_price.amount.as_double());
         });
 
-        this->update_opening_price(stats.opening_price);
+        this->update_last_close(stats.last_close);
+
+        listings.cost_basis.currency.set(asset.currency.quote);
     }
 
    public:
@@ -499,10 +493,10 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         last_price_ = newer;
     }
 
-    void update_opening_price(double value)
+    void update_last_close(double value)
     {
-        opening_price_ = value;
-        listings.opening_price.amount.set(value);
+        last_close_ = value;
+        listings.last_close.amount.set(value);
         this->recalculate_percent_change();
     }
 
@@ -523,10 +517,10 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
    private:
     void recalculate_percent_change()
     {
-        if (opening_price_ == 0.)
+        if (last_close_ == 0.)
             return;
         listings.percent_change.set_percent(
-            100. * ((last_price_ - opening_price_) / opening_price_));
+            100. * ((last_price_ - last_close_) / last_close_));
     }
 
     void update_value(double quantity, double last_price)
@@ -538,8 +532,8 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     Asset asset_;
 
     // These are only used for percentage calculation, so double is fine.
-    double last_price_    = 0.;
-    double opening_price_ = 0.;
+    double last_price_ = 0.;
+    double last_close_ = 0.;
 };
 
 class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
@@ -616,10 +610,10 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     /** No-op if asset is not in the ticker list. */
     void init_ticker(Asset const& asset, Stats const& stats)
     {
-        auto const current_str = std::to_string(stats.current_price);
+        auto const current_str = std::to_string(stats.last_price);
         for (Ticker& child : ticker_view(asset)) {
             child.update_last_price(current_str);
-            child.update_opening_price(stats.opening_price);
+            child.update_last_close(stats.last_close);
         }
     }
 
@@ -662,7 +656,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         search_results_received = markets_.search_results_received;
 };
 
-class Column_labels : public ox::HArray<ox::HLabel, 11> {
+class Column_labels : public ox::HArray<ox::HLabel, 13> {
    public:
     ox::HLabel& buffer_1       = this->get<0>();
     ox::HLabel& name           = this->get<1>();
@@ -670,11 +664,13 @@ class Column_labels : public ox::HArray<ox::HLabel, 11> {
     ox::HLabel& last_price     = this->get<3>();
     ox::HLabel& percent_change = this->get<4>();
     ox::HLabel& buffer_3       = this->get<5>();
-    ox::HLabel& opening_price  = this->get<6>();
+    ox::HLabel& last_close     = this->get<6>();
     ox::HLabel& buffer_4       = this->get<7>();
     ox::HLabel& quantity       = this->get<8>();
     ox::HLabel& buffer_5       = this->get<9>();
     ox::HLabel& value          = this->get<10>();
+    ox::HLabel& buffer_6       = this->get<11>();
+    ox::HLabel& cost_basis     = this->get<12>();
 
    public:
     Column_labels()
@@ -683,20 +679,23 @@ class Column_labels : public ox::HArray<ox::HLabel, 11> {
         *this | fixed_height(1);
         buffer_1 | fixed_width(5);
         name.set_text(U" Asset" | ox::Trait::Bold);
-        name | fixed_width(22);
+        name | fixed_width(21);
         buffer_2 | fixed_width(2);
-        last_price.set_text(U"   Last Price" | ox::Trait::Bold);
-        last_price | fixed_width(14);
-        percent_change.set_text(U"Change   " | ox::Trait::Bold);
-        percent_change | align_right() | fixed_width(18);
+        last_price.set_text(U" Last Price" | ox::Trait::Bold);
+        last_price | fixed_width(12);
+        percent_change.set_text(U"Change " | ox::Trait::Bold);
+        percent_change | align_right() | fixed_width(12);
         buffer_3 | fixed_width(2);
-        opening_price.set_text(U"   Opening Price" | ox::Trait::Bold);
-        opening_price | fixed_width(16);
+        last_close.set_text(U" Last Close" | ox::Trait::Bold);
+        last_close | fixed_width(13);
         buffer_4 | fixed_width(3);
         quantity.set_text(U"Quantity" | ox::Trait::Bold);
         quantity | fixed_width(12);
         buffer_5 | fixed_width(2);
-        value.set_text(U"   Value" | ox::Trait::Bold);
+        value.set_text(U"Value " | ox::Trait::Bold);
+        value | align_right() | fixed_width(13);
+        buffer_6 | fixed_width(1);
+        cost_basis.set_text(U" Cost Basis" | ox::Trait::Bold);
     }
 };
 

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <iomanip>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -38,19 +40,13 @@ inline void format_decimal_zeros(std::string& value)
         value.pop_back();
 }
 
-/// Round value to the hundredths place
-[[nodiscard]] inline auto hundredths_round(std::string const& value)
+/// Round double and output as string.
+[[nodiscard]] inline auto round_and_to_string(double value, int decimal_places)
     -> std::string
 {
-    auto const decimal = value.rfind('.');
-    if (decimal == std::string::npos)
-        return value;
-    auto copy       = value;
-    auto const diff = value.size() - decimal;
-    if (diff < 3)
-        return value;
-    copy.erase(decimal + 3);
-    return copy;
+    auto ss = std::stringstream{};
+    ss << std::fixed << std::setprecision(decimal_places) << value;
+    return ss.str();
 }
 
 [[nodiscard]] inline auto currency_to_symbol(std::string const& x)
