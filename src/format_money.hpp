@@ -14,10 +14,12 @@ namespace crab {
 /// Insert comma every three digits before the decimal.
 inline void insert_thousands_separators(std::string& value)
 {
-    auto decimal = value.rfind('.');
+    std::size_t decimal = value.rfind('.');
     assert(decimal != std::string::npos);
     while ((decimal - 3 < decimal) && (decimal - 3 != 0)) {
         decimal -= 3;
+        if (decimal == 1 && value[0] == '-')  // minus sign fix
+            return;
         value.insert(decimal, 1, ',');
     }
 }

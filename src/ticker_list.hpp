@@ -741,9 +741,9 @@ class Column_labels : public ox::HArray<ox::HLabel, 16> {
         buffer_6 | fixed_width(1);
         cost_basis.set_text(U"   Cost Basis" | ox::Trait::Bold);
         cost_basis | fixed_width(13);
-        open_pl.set_text(U" Open P&L " | ox::Trait::Bold);
+        open_pl.set_text(U"Open P&L " | ox::Trait::Bold);
         open_pl | align_right() | fixed_width(13);
-        daily_pl.set_text(U" Daily P&L " | ox::Trait::Bold);
+        daily_pl.set_text(U"Daily P&L " | ox::Trait::Bold);
         daily_pl | align_right() | fixed_width(13);
     }
 };
