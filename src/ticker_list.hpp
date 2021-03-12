@@ -262,6 +262,9 @@ struct Price_edit : ox::HPair<Currency_display, Quantity_edit> {
  *  is used for decimal alignment, if \p hundredths_round is true, rounds. */
 class Aligned_amount_display : public ox::HLabel {
    public:
+    sl::Signal<void(double)> amount_updated;
+
+   public:
     void set(double amount)
     {
         double_ = amount;
@@ -273,6 +276,7 @@ class Aligned_amount_display : public ox::HLabel {
         insert_thousands_separators(string_);
         string_ = align_decimal(string_, offset_);
         this->ox::HLabel::set_text(string_);
+        amount_updated.emit(double_);
     }
 
     void set(std::string amount) { this->set(std::stod(amount)); }
@@ -379,6 +383,7 @@ class Listings : public ox::HTuple<Hamburger,
                                    Aligned_price_display,
                                    ox::Widget,
                                    Price_edit,
+                                   Aligned_price_display,
                                    Div,
                                    Remove_btn> {
    public:
@@ -397,8 +402,9 @@ class Listings : public ox::HTuple<Hamburger,
     Aligned_price_display& value    = this->get<12>();
     ox::Widget& buffer_5            = this->get<13>();
     Price_edit& cost_basis          = this->get<14>();
-    Div& div2                       = this->get<15>();
-    Remove_btn& remove_btn          = this->get<16>();
+    Aligned_price_display& open_pl  = this->get<15>();
+    Div& div2                       = this->get<16>();
+    Remove_btn& remove_btn          = this->get<17>();
 
    public:
     Listings()
@@ -415,6 +421,7 @@ class Listings : public ox::HTuple<Hamburger,
         buffer_4 | fixed_width(2);
         value | fixed_width(13);
         buffer_5 | fixed_width(1);
+        cost_basis | fixed_width(13);
     }
 
    public:
@@ -460,6 +467,8 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         if (is_USD_like(asset_.currency.quote)) {
             listings.value.amount.round_to_hundredths(true);
             listings.value.amount.set_offset(6);
+            listings.open_pl.amount.round_to_hundredths(true);
+            listings.open_pl.amount.set_offset(6);
         }
         listings.name.set(asset);
 
@@ -474,6 +483,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         this->update_last_close(stats.last_close);
 
         listings.cost_basis.currency.set(asset.currency.quote);
+        listings.open_pl.currency.set(asset.currency.quote);
+        listings.value.amount.amount_updated.connect(
+            [this](double) { this->reset_open_pl(); });
+        listings.cost_basis.amount.quantity_updated.connect(
+            [this](double) { this->reset_open_pl(); });
     }
 
    public:
@@ -526,6 +540,15 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     void update_value(double quantity, double last_price)
     {
         listings.value.amount.set(calc_value(quantity, last_price));
+    }
+
+    void reset_open_pl()
+    {
+        auto const initial_value = listings.quantity.quantity() *
+                                   listings.cost_basis.amount.quantity();
+        auto const current_value = listings.value.amount.as_double();
+        auto const result        = current_value - initial_value;
+        listings.open_pl.amount.set(result);
     }
 
    private:
@@ -656,7 +679,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         search_results_received = markets_.search_results_received;
 };
 
-class Column_labels : public ox::HArray<ox::HLabel, 13> {
+class Column_labels : public ox::HArray<ox::HLabel, 14> {
    public:
     ox::HLabel& buffer_1       = this->get<0>();
     ox::HLabel& name           = this->get<1>();
@@ -671,6 +694,7 @@ class Column_labels : public ox::HArray<ox::HLabel, 13> {
     ox::HLabel& value          = this->get<10>();
     ox::HLabel& buffer_6       = this->get<11>();
     ox::HLabel& cost_basis     = this->get<12>();
+    ox::HLabel& open_pl        = this->get<13>();
 
    public:
     Column_labels()
@@ -696,6 +720,9 @@ class Column_labels : public ox::HArray<ox::HLabel, 13> {
         value | align_right() | fixed_width(13);
         buffer_6 | fixed_width(1);
         cost_basis.set_text(U" Cost Basis" | ox::Trait::Bold);
+        cost_basis | fixed_width(13);
+        open_pl.set_text(U" Open P&L" | ox::Trait::Bold);
+        open_pl | align_right();
     }
 };
 
