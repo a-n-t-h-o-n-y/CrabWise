@@ -32,12 +32,15 @@ class Search_input
         spinner | bg(crab::Almost_bg);
         search_field | bg(crab::Almost_bg);
 
-        search_field.edit_finished.connect(
-            [this](std::string const& s) { this->search_request(s); });
-        button.pressed.connect([this] {
-            this->search_request(this->search_field.contents().str());
+        search_field.edit_finished.connect([this](std::string const& s) {
+            if (!s.empty())
+                this->search_request.emit(s);
         });
-
+        button.pressed.connect([this] {
+            auto const request = this->search_field.contents().str();
+            if (!request.empty())
+                this->search_request.emit(request);
+        });
         search_request.connect([this](auto const&) { spinner.start(); });
     }
 
