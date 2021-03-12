@@ -214,6 +214,9 @@ class Currency_display : public ox::HLabel {
 /** Inserts thousands separators and formats decimal zeros if needed. */
 class Amount_display : public ox::HLabel {
    public:
+    sl::Signal<void(double)> amount_updated;
+
+   public:
     void set(double amount)
     {
         double_ = amount;
@@ -221,6 +224,7 @@ class Amount_display : public ox::HLabel {
         format_decimal_zeros(string_);
         insert_thousands_separators(string_);
         this->ox::HLabel::set_text(string_);
+        amount_updated.emit(double_);
     }
 
     void set(std::string amount)
@@ -230,6 +234,7 @@ class Amount_display : public ox::HLabel {
         format_decimal_zeros(string_);
         insert_thousands_separators(string_);
         this->ox::HLabel::set_text(string_);
+        amount_updated.emit(double_);
     }
 
     /// Return set value as a double.
@@ -466,6 +471,20 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     Ticker(Asset asset, Stats stats, double quantity, double cost_basis)
         : asset_{asset}, last_price_{stats.last_price}
     {
+        listings.value.amount.amount_updated.connect([this](double) {
+            this->reset_open_pl();
+            this->reset_daily_pl();
+        });
+        listings.cost_basis.amount.quantity_updated.connect(
+            [this](double) { this->reset_open_pl(); });
+        listings.quantity.quantity_updated.connect([this](double quant) {
+            this->update_value(quant, listings.last_price.amount.as_double());
+        });
+        listings.last_close.amount.amount_updated.connect([this](double) {
+            this->recalculate_percent_change();
+            this->reset_daily_pl();
+        });
+
         listings.last_price.currency.set(asset.currency.quote);
         listings.last_close.currency.set(asset.currency.quote);
         listings.value.currency.set(asset.currency.quote);
@@ -484,38 +503,29 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
         listings.quantity.initialize(quantity);
         listings.cost_basis.amount.initialize(cost_basis);
-        listings.quantity.quantity_updated.connect([this](double quant) {
-            this->update_value(quant, listings.last_price.amount.as_double());
-        });
 
         this->update_last_close(stats.last_close);
 
         listings.cost_basis.currency.set(asset.currency.quote);
         listings.open_pl.currency.set(asset.currency.quote);
         listings.daily_pl.currency.set(asset.currency.quote);
-        listings.value.amount.amount_updated.connect([this](double) {
-            this->reset_open_pl();
-            this->reset_daily_pl();
-        });
-        listings.cost_basis.amount.quantity_updated.connect(
-            [this](double) { this->reset_open_pl(); });
     }
 
    public:
     void update_last_price(std::string const& value)
     {
         listings.last_price.amount.set(value);
-        this->recalculate_percent_change();
         auto count       = std::size_t{0};
         auto const newer = std::stod(value, &count);
         assert(count == value.size());
+        last_price_ = newer;
         if (newer > last_price_)
             listings.indicator.emit_positive();
         else if (newer < last_price_)
             listings.indicator.emit_negative();
+        this->recalculate_percent_change();
         this->update_value(listings.quantity.quantity(),
                            listings.last_price.amount.as_double());
-        last_price_ = newer;
     }
 
     void update_last_close(double value)
