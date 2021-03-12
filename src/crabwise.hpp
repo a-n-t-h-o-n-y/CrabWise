@@ -17,7 +17,6 @@
 #include "filesystem.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
-#include "termox/widget/pipe.hpp"
 #include "ticker_list.hpp"
 
 namespace crab {

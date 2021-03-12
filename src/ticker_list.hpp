@@ -18,8 +18,6 @@
 #include "palette.hpp"
 #include "price.hpp"
 #include "stats.hpp"
-#include "termox/system/key.hpp"
-#include "termox/widget/pipe.hpp"
 
 namespace crab {
 
@@ -103,6 +101,7 @@ class Quantity_edit : public ox::Textbox {
         value_ = value;
     }
 
+    // TODO Change to as_double?
     auto quantity() const -> double { return value_; }
 
    protected:
@@ -659,8 +658,8 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     {
         auto const current_str = std::to_string(stats.last_price);
         for (Ticker& child : ticker_view(asset)) {
-            child.update_last_price(current_str);
             child.update_last_close(stats.last_close);
+            child.update_last_price(current_str);
         }
     }
 
