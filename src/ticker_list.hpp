@@ -464,7 +464,7 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     sl::Signal<void()>& remove_me = listings.remove_btn.remove_me;
 
    public:
-    Ticker(Asset asset, Stats stats, double quantity)
+    Ticker(Asset asset, Stats stats, double quantity, double cost_basis)
         : asset_{asset}, last_price_{stats.last_price}
     {
         listings.last_price.currency.set(asset.currency.quote);
@@ -484,6 +484,7 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         this->recalculate_percent_change();
 
         listings.quantity.initialize(quantity);
+        listings.cost_basis.amount.initialize(cost_basis);
         listings.quantity.quantity_updated.connect([this](double quant) {
             this->update_value(quant, listings.last_price.amount.as_double());
         });
@@ -530,6 +531,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
     [[nodiscard]] auto quantity() const -> double
     {
         return listings.quantity.quantity();
+    }
+
+    [[nodiscard]] auto cost_basis() const -> double
+    {
+        return listings.cost_basis.amount.quantity();
     }
 
    private:
@@ -611,7 +617,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     ~Ticker_list() { markets_.shutdown(); }
 
    public:
-    void add_ticker(Asset const& asset, double quantity)
+    void add_ticker(Asset const& asset, double quantity, double cost_basis)
     {
         Ticker* const existing = this->find_ticker(asset);
         auto stats             = Stats{-1., 0.};
@@ -622,7 +628,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         else
             stats = existing->listings.current_stats();
 
-        auto& child = this->make_child(asset, stats, quantity);
+        auto& child = this->make_child(asset, stats, quantity, cost_basis);
         child.remove_me.connect(
             [this, &child_ref = child] { this->remove_ticker(child_ref); });
         child.listings.hamburger.pressed.connect(

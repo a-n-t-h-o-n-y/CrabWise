@@ -85,7 +85,7 @@ class App_space
 
         asset_picker.search_results.selected.connect(
             [this](Asset const& asset) {
-                this->ticker_list.add_ticker(asset, 0.);
+                this->ticker_list.add_ticker(asset, 0., 0.);
             });
 
         asset_picker.search_input.search_request.connect(
@@ -128,14 +128,17 @@ class App_space
         }
         result.append("    " + ticker.asset().currency.base + ' ' +
                       ticker.asset().currency.quote + ' ' +
-                      std::to_string(ticker.quantity()) + '\n');
+                      std::to_string(ticker.quantity()) + ' ' +
+                      std::to_string(ticker.cost_basis()) + '\n');
         return result;
     }
 
     [[nodiscard]] static auto generate_save_string(Ticker_list& list)
         -> std::string
     {
-        auto result   = std::string{};
+        auto result = std::string{
+            "# ~ CrabWise ~\n# Exchange:\n#   Base Quote [Quantity] "
+            "[Cost Basis]\n\n"};
         auto exchange = std::string{};
         for (Ticker& child : list.get_children()) {
             result.append(to_string(child, exchange != child.asset().exchange));
@@ -157,8 +160,8 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         titlebar.title.set_text(U"CrabWise" | ox::Trait::Bold);
         ox::Terminal::set_palette(crab::palette);
         auto const init_assets = parse_init_file(assets_filepath());
-        for (auto const& [asset, quantity] : init_assets)
-            app_space.ticker_list.add_ticker(asset, quantity);
+        for (auto const& [asset, quantity, cost_basis] : init_assets)
+            app_space.ticker_list.add_ticker(asset, quantity, cost_basis);
     }
 
    private:
@@ -174,7 +177,7 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
     /** returns empty Asset and exchange name, or empty exchange name and full
      *  Asset. */
     [[nodiscard]] static auto parse_line(std::string const& line)
-        -> std::tuple<std::string, Currency_pair, double>
+        -> std::tuple<std::string, Currency_pair, double, double>
     {
         auto ss    = std::istringstream{line};
         auto first = std::string{};
@@ -184,10 +187,10 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
 
         if (first[first.size() - 1] == ':') {
             first.pop_back();
-            return {upper(first), {"", ""}, 0.};
+            return {upper(first), {"", ""}, 0., 0.};
         }
         if (first.front() == '#')
-            return {"", {"", ""}, 0.};
+            return {"", {"", ""}, 0., 0.};
 
         auto quote = std::string{};
         ss >> quote;
@@ -195,7 +198,10 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         auto quantity = 0.;
         if (ss)
             ss >> quantity;
-        return {"", {upper(first), upper(quote)}, quantity};
+        auto cost_basis = 0.;
+        if (ss)
+            ss >> cost_basis;
+        return {"", {upper(first), upper(quote)}, quantity, cost_basis};
     }
 
     /// Return true if string is all space characters or is empty.
@@ -207,37 +213,42 @@ class Crabwise : public ox::VTuple<ox::Titlebar, App_space> {
         return true;
     }
 
-    // Quantity is optional, defaults to zero
+    // Quantity and Cost_basis are optional, defaults to zero
     // assets.txt Format
     // Exchange:
-    //     Base Quote Quantity
-    //     Base Quote Quantity
-    //     Base Quote Quantity
+    //     Base Quote Quantity Cost_basis
+    //     Base Quote Quantity Cost_basis
+    //     Base Quote Quantity Cost_basis
     //
     // Stock:
-    //     Symbol Quantity
-    //     Symbol Quantity
+    //     Symbol Quantity Cost_basis
+    //     Symbol Quantity Cost_basis
     // # Comment
     [[nodiscard]] static auto parse_init_file(fs::path const& filepath)
-        -> std::vector<std::pair<Asset, double>>
+        -> std::vector<std::tuple<Asset, double, double>>
     {
         if (!fs::exists(filepath))
             return {};
-        auto result           = std::vector<std::pair<Asset, double>>{};
-        auto file             = std::ifstream{filepath.string()};
-        auto line             = std::string{};
+        auto result = std::vector<std::tuple<Asset, double, double>>{};
+        auto file   = std::ifstream{filepath.string()};
+        auto line   = std::string{};
         auto current_exchange = std::string{};
         while (std::getline(file, line, '\n')) {
             if (all_is_space(line))
                 continue;
-            auto const [exchange, currency, quantity] = parse_line(line);
+            auto const [exchange, currency, quantity, cost_basis] =
+                parse_line(line);
             if (exchange.empty() && currency.base.empty())
                 continue;
             if (exchange.empty()) {
-                if (current_exchange == "STOCK")
-                    result.push_back({{"", {currency.base, "USD"}}, quantity});
-                else
-                    result.push_back({{current_exchange, currency}, quantity});
+                if (current_exchange == "STOCK") {
+                    result.push_back(
+                        {{"", {currency.base, "USD"}}, quantity, cost_basis});
+                }
+                else {
+                    result.push_back(
+                        {{current_exchange, currency}, quantity, cost_basis});
+                }
             }
             else
                 current_exchange = exchange;

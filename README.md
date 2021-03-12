@@ -60,26 +60,26 @@ current state of the app, so it can be reloaded later.
 
 This is the file your data is stored in, it has a simple format. `#` starts a
 comment, has to be on its own line. Exchanges can be listed multiple times, the
-order listed is the order read into the program. Quantities are optional. Any
-number of whitespace is used a separator. Base currency is listed first, then
-the currency it is quoted in on the exchange. Stocks are listed with the literal
-'Stock' header.
+order listed is the order read into the program. `Quantity` and `Stock_basis`
+are optional. Any number of whitespace is used a separator. Base currency is
+listed first, then the currency it is quoted in on the exchange. Stocks are
+listed with the literal 'Stock' header.
 
 ```txt
 Coinbase:
-    BTC  USD Quantity
-    AAVE USD Quantity
-    GRT  USD Quantity
+    BTC  USD Quantity Cost_basis
+    AAVE USD Quantity Cost_basis
+    GRT  USD Quantity Cost_basis
 
 Binance:
-    BTC USDT Quantity
-    BNB BTC  Quantity
+    BTC USDT Quantity Cost_basis
+    BNB BTC  Quantity Cost_basis
 
 # Comment
 
 Stock:
-    MSFT Quantity
-    TSLA Quantity
+    MSFT Quantity Cost_basis
+    TSLA Quantity Cost_basis
 ```
 
 Use with a Terminal that supports True Color.
