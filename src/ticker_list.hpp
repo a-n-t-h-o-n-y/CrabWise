@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <termox/common/filter_view.hpp>
 #include <termox/termox.hpp>
 
 #include "asset.hpp"
@@ -413,6 +414,13 @@ class Listings : public ox::HTuple<Hamburger,
         quantity | fixed_width(12);
         buffer_4 | fixed_width(2);
     }
+
+   public:
+    [[nodiscard]] auto current_stats() const -> Stats
+    {
+        return {last_price.amount.as_double(),
+                opening_price.amount.as_double()};
+    }
 };
 
 class Empty : public ox::Widget {
@@ -538,6 +546,22 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    private:
     using Base_t = ox::Passive<ox::layout::Vertical<Ticker>>;
 
+   private:
+    /// Return pointer to first Ticker if asset matches, nullptr if can't find.
+    [[nodiscard]] auto find_ticker(Asset const& asset) -> Ticker*
+    {
+        return this->find_child_if(
+            [&](Ticker& child) { return child.asset() == asset; });
+    }
+
+    /// Returns a filtered view of all Tickers holding the given \p asset.
+    [[nodiscard]] auto ticker_view(Asset const& asset)
+    {
+        return ox::Owning_filter_view{
+            this->get_children(),
+            [asset](auto const& child) { return child.asset() == asset; }};
+    }
+
    public:
     Ticker_list()
     {
@@ -554,46 +578,49 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    public:
     void add_ticker(Asset const& asset, double quantity)
     {
-        if (this->find_ticker(asset) != nullptr)
-            return;  // Already Added
-        markets_.subscribe(asset);
-        markets_.request_stats(asset);
-        auto& child = this->make_child(asset, Stats{-1., 0.}, quantity);
+        Ticker* const existing = this->find_ticker(asset);
+        auto stats             = Stats{-1., 0.};
+        if (existing == nullptr) {
+            markets_.subscribe(asset);
+            markets_.request_stats(asset);
+        }
+        else
+            stats = existing->listings.current_stats();
+
+        auto& child = this->make_child(asset, stats, quantity);
         child.remove_me.connect(
-            [this, asset = child.asset()] { this->remove_ticker(asset); });
+            [this, &child_ref = child] { this->remove_ticker(child_ref); });
         child.listings.hamburger.pressed.connect(
             [this, &child] { last_selected_ = &child; });
         child.listings.hamburger.install_event_filter(*this);
     }
 
-    void remove_ticker(Asset const& asset)
+    void remove_ticker(Ticker& ticker_ref)
     {
-        auto const at = this->find_ticker(asset);
-        if (at == nullptr)
-            return;
-        markets_.unsubscribe(asset);
-        if (last_selected_ == at)
+        auto const asset = ticker_ref.asset();
+        if (last_selected_ == &ticker_ref)
             last_selected_ = nullptr;
-        this->remove_and_delete_child(at);
+        this->remove_and_delete_child(&ticker_ref);
+        if (this->find_ticker(asset) == nullptr)  // Last ticker of this asset.
+            markets_.unsubscribe(asset);
     }
 
+    /// Update the last price of each Ticker with the Asset within \p price.
     void update_ticker(Price price)
     {
-        auto const at = this->find_ticker(price.asset);
-        if (at == nullptr)
-            return;
-        at->update_last_price(price.value);
+        for (Ticker& child : ticker_view(price.asset))
+            child.update_last_price(price.value);
     }
 
     /// Set initial price and opening price of the given asset.
     /** No-op if asset is not in the ticker list. */
     void init_ticker(Asset const& asset, Stats const& stats)
     {
-        auto const at = this->find_ticker(asset);
-        if (at == nullptr)
-            return;
-        at->update_last_price(std::to_string(stats.current_price));
-        at->update_opening_price(stats.opening_price);
+        auto const current_str = std::to_string(stats.current_price);
+        for (Ticker& child : ticker_view(asset)) {
+            child.update_last_price(current_str);
+            child.update_opening_price(stats.opening_price);
+        }
     }
 
     /// Return list of all Assets that can be added as Tickers.
@@ -629,14 +656,6 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    private:
     Markets markets_;
     Ticker* last_selected_ = nullptr;
-
-   private:
-    /// Return pointer to Ticker if asset matches, nullptr if can't find.
-    [[nodiscard]] auto find_ticker(Asset const& asset) -> Ticker*
-    {
-        return this->find_child_if(
-            [&](Ticker& child) { return child.asset() == asset; });
-    }
 
    public:
     sl::Signal<void(std::vector<Search_result> const&)>&
