@@ -27,7 +27,7 @@ namespace {
     static auto file_ = [] {
         auto fs =
             std::ofstream{crab::log_filepath().string(), std::ios_base::app};
-        fs << '\n' << timestamp() << "--------------------------------\n";
+        fs << '\n' << timestamp() << " - - - - -\n";
         return fs;
     }();
     return file_;
@@ -46,7 +46,7 @@ namespace crab {
 void log_status(std::string const& x)
 {
     auto const lock = std::lock_guard{file_mtx()};
-    file() << "Status: " << x << '\n' << std::flush;
+    file() << x << '\n' << std::flush;
 }
 
 void log_error(std::string const& x)

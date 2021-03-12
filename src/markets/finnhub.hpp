@@ -103,7 +103,7 @@ class Finnhub {
 
     void ws_connect()
     {
-        log_status("Websocket connect: ws.finnhub.io");
+        log_status("WS connect: ws.finnhub.io");
         try {
             ws_.connect("ws.finnhub.io", "/?" + this->get_key_param());
         }

@@ -60,7 +60,7 @@ current state of the app, so it can be reloaded later.
 
 This is the file your data is stored in, it has a simple format. `#` starts a
 comment, has to be on its own line. Exchanges can be listed multiple times, the
-order listed is the order read into the program. `Quantity` and `Stock_basis`
+order listed is the order read into the program. `Quantity` and `Cost_basis`
 are optional. Any number of whitespace is used a separator. Base currency is
 listed first, then the currency it is quoted in on the exchange. Stocks are
 listed with the literal 'Stock' header.

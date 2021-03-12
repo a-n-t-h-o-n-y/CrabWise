@@ -74,7 +74,7 @@ auto Finnhub::stats(Asset const& asset) -> Stats
         "quote?symbol=" + ntwk::url_encode(asset_str), this->get_key_param());
     {
         auto const no_key_request = request.substr(0, request.find("token"));
-        log_status("accessing finnhub.io" + no_key_request);
+        log_status("GET finnhub.io" + no_key_request);
     }
     try {
         auto const message = https_socket_.get(request);
@@ -97,7 +97,7 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
     auto const request = build_rest_query("search?q=" + ntwk::url_encode(query),
                                           this->get_key_param());
     auto const no_key_request = request.substr(0, request.find("token"));
-    log_status("accessing finnhub.io" + no_key_request);
+    log_status("GET finnhub.io" + no_key_request);
     try {
         auto const message = https_socket_.get(request);
         check_response(message, "Finnhub - Failed to search for: " + query);
@@ -136,7 +136,7 @@ void Finnhub::subscribe(Asset const& asset)
                       id_cache_.find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
-    log_status("Finnhub Websocket Subscribing: " + asset.exchange + ' ' +
+    log_status("Finnhub WS Subscribing: " + asset.exchange + ' ' +
                asset.currency.base + ' ' + asset.currency.quote);
     try {
         ws_.write(json);
@@ -155,7 +155,7 @@ void Finnhub::unsubscribe(Asset const& asset)
                       id_cache_.find_symbol_id(asset) + "\"}";
     if (!ws_.is_connected())
         this->ws_connect();
-    log_status("Finnhub Websocket Unsubscribing: " + asset.exchange + ' ' +
+    log_status("Finnhub WS Unsubscribing: " + asset.exchange + ' ' +
                asset.currency.base + ' ' + asset.currency.quote);
     try {
         ws_.write(json);
@@ -188,7 +188,7 @@ auto Finnhub::stream_read() -> std::vector<Price>
     catch (std::exception const& e) {
         log_error("Finnhub Failed to read from Websocket: " +
                   std::string{e.what()});
-        return {};
+        throw;
     }
 }
 

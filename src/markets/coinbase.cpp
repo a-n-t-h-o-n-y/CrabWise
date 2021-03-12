@@ -113,7 +113,7 @@ void Coinbase::subscribe(Asset const& asset)
     auto const json =
         std::string{"{\"type\":\"subscribe\",\"product_ids\":[\""} +
         to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
-    log_status("Coinbase Websocket Subscribing: " + asset.exchange + ' ' +
+    log_status("Coinbase WS Subscribing: " + asset.exchange + ' ' +
                asset.currency.base + ' ' + asset.currency.quote);
     try {
         ws_.write(json);
@@ -132,7 +132,7 @@ void Coinbase::unsubscribe(Asset const& asset)
     auto const json =
         std::string{"{\"type\":\"unsubscribe\",\"product_ids\":[\""} +
         to_id(asset.currency) + "\"],\"channels\":[\"ticker\"]}";
-    log_status("Coinbase Websocket Unsubscribing: " + asset.exchange + ' ' +
+    log_status("Coinbase WS Unsubscribing: " + asset.exchange + ' ' +
                asset.currency.base + ' ' + asset.currency.quote);
     try {
         ws_.write(json);
@@ -154,10 +154,14 @@ auto Coinbase::stream_read() -> Price
         try {
             price = parse(ws_.read());
         }
-        catch (std::exception const& e) {
+        catch (Crab_error const& e) {
+            log_error("Coinbase got non-fatal error from WS read: " +
+                      std::string{e.what()});
+        }
+        catch (ntwk::Error const& e) {
             log_error("Coinbase Failed to read from Websocket: " +
                       std::string{e.what()});
-            return {};
+            throw;
         }
     }
     return *price;

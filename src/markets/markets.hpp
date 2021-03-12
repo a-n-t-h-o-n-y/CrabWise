@@ -162,12 +162,14 @@ class Markets {
     std::mutex https_socket_mtx_;
 
    private:
+    // TODO should take event loop reference so it can exit itself.
     template <typename Market_t, typename Locking_queue_t>
     auto generate_loop_fn(Market_t& market,
                           Locking_queue_t& to_sub,
-                          Locking_queue_t& to_unsub)
+                          Locking_queue_t& to_unsub,
+                          ox::Event_loop& loop)
     {
-        return [this, &market, &to_sub, &to_unsub](ox::Event_queue& q) {
+        return [this, &market, &to_sub, &to_unsub, &loop](ox::Event_queue& q) {
             {  // Subscribe
                 auto const lock = to_sub.lock();
                 for (auto const& asset : to_sub)
@@ -183,16 +185,22 @@ class Markets {
             if (market.subscription_count() == 0)
                 std::this_thread::sleep_for(std::chrono::milliseconds{100});
             else {
-                auto const prices = market.stream_read();
-                q.append(ox::Custom_event{[this, prices] {
-                    auto const lock = std::lock_guard{price_update_mtx_};
-                    if constexpr (std::is_same_v<decltype(prices), const Price>)
-                        this->price_update(prices);
-                    else {
-                        for (auto const& p : prices)
-                            this->price_update(p);
-                    }
-                }});
+                try {
+                    auto const prices = market.stream_read();
+                    q.append(ox::Custom_event{[this, prices] {
+                        auto const lock = std::lock_guard{price_update_mtx_};
+                        if constexpr (std::is_same_v<decltype(prices),
+                                                     const Price>)
+                            this->price_update(prices);
+                        else {
+                            for (auto const& p : prices)
+                                this->price_update(p);
+                        }
+                    }});
+                }
+                catch (std::exception const&) {
+                    loop.exit(1);
+                }
             }
         };
     }
@@ -201,8 +209,9 @@ class Markets {
     {
         if (finnhub_loop_.is_running())
             return;
-        finnhub_loop_.run_async(this->generate_loop_fn(
-            finnhub_, finnhub_to_subscribe_to_, finnhub_to_unsubscribe_to_));
+        finnhub_loop_.run_async(
+            this->generate_loop_fn(finnhub_, finnhub_to_subscribe_to_,
+                                   finnhub_to_unsubscribe_to_, finnhub_loop_));
     }
 
     void launch_coinbase()
@@ -210,7 +219,8 @@ class Markets {
         if (coinbase_loop_.is_running())
             return;
         coinbase_loop_.run_async(this->generate_loop_fn(
-            coinbase_, coinbase_to_subscribe_to_, coinbase_to_unsubscribe_to_));
+            coinbase_, coinbase_to_subscribe_to_, coinbase_to_unsubscribe_to_,
+            coinbase_loop_));
     }
 
     void launch_stats_loop()

@@ -39,7 +39,7 @@ class Coinbase {
    private:
     void ws_connect()
     {
-        log_status("Websocket connect: ws-feed.pro.coinbase.com");
+        log_status("WS connect: ws-feed.pro.coinbase.com");
         try {
             ws_.connect("ws-feed.pro.coinbase.com");
         }
