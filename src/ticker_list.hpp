@@ -384,6 +384,8 @@ class Listings : public ox::HTuple<Hamburger,
                                    ox::Widget,
                                    Price_edit,
                                    Aligned_price_display,
+                                   Aligned_price_display,
+                                   ox::Widget,
                                    Div,
                                    Remove_btn> {
    public:
@@ -403,8 +405,10 @@ class Listings : public ox::HTuple<Hamburger,
     ox::Widget& buffer_5            = this->get<13>();
     Price_edit& cost_basis          = this->get<14>();
     Aligned_price_display& open_pl  = this->get<15>();
-    Div& div2                       = this->get<16>();
-    Remove_btn& remove_btn          = this->get<17>();
+    Aligned_price_display& daily_pl = this->get<16>();
+    ox::Widget& buffer_6            = this->get<17>();
+    Div& div2                       = this->get<18>();
+    Remove_btn& remove_btn          = this->get<19>();
 
    public:
     Listings()
@@ -422,6 +426,8 @@ class Listings : public ox::HTuple<Hamburger,
         value | fixed_width(13);
         buffer_5 | fixed_width(1);
         cost_basis | fixed_width(13);
+        open_pl | fixed_width(13);
+        daily_pl | fixed_width(13);
     }
 
    public:
@@ -469,6 +475,8 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
             listings.value.amount.set_offset(6);
             listings.open_pl.amount.round_to_hundredths(true);
             listings.open_pl.amount.set_offset(6);
+            listings.daily_pl.amount.round_to_hundredths(true);
+            listings.daily_pl.amount.set_offset(6);
         }
         listings.name.set(asset);
 
@@ -484,8 +492,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
 
         listings.cost_basis.currency.set(asset.currency.quote);
         listings.open_pl.currency.set(asset.currency.quote);
-        listings.value.amount.amount_updated.connect(
-            [this](double) { this->reset_open_pl(); });
+        listings.daily_pl.currency.set(asset.currency.quote);
+        listings.value.amount.amount_updated.connect([this](double) {
+            this->reset_open_pl();
+            this->reset_daily_pl();
+        });
         listings.cost_basis.amount.quantity_updated.connect(
             [this](double) { this->reset_open_pl(); });
     }
@@ -547,8 +558,15 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         auto const initial_value = listings.quantity.quantity() *
                                    listings.cost_basis.amount.quantity();
         auto const current_value = listings.value.amount.as_double();
-        auto const result        = current_value - initial_value;
-        listings.open_pl.amount.set(result);
+        listings.open_pl.amount.set(current_value - initial_value);
+    }
+
+    void reset_daily_pl()
+    {
+        auto const diff = listings.last_price.amount.as_double() -
+                          listings.last_close.amount.as_double();
+        auto const quantity = listings.quantity.quantity();
+        listings.daily_pl.amount.set(quantity * diff);
     }
 
    private:
@@ -679,7 +697,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         search_results_received = markets_.search_results_received;
 };
 
-class Column_labels : public ox::HArray<ox::HLabel, 14> {
+class Column_labels : public ox::HArray<ox::HLabel, 16> {
    public:
     ox::HLabel& buffer_1       = this->get<0>();
     ox::HLabel& name           = this->get<1>();
@@ -695,6 +713,8 @@ class Column_labels : public ox::HArray<ox::HLabel, 14> {
     ox::HLabel& buffer_6       = this->get<11>();
     ox::HLabel& cost_basis     = this->get<12>();
     ox::HLabel& open_pl        = this->get<13>();
+    ox::HLabel& daily_pl       = this->get<14>();
+    ox::HLabel& buffer         = this->get<15>();
 
    public:
     Column_labels()
@@ -719,10 +739,12 @@ class Column_labels : public ox::HArray<ox::HLabel, 14> {
         value.set_text(U"Value " | ox::Trait::Bold);
         value | align_right() | fixed_width(13);
         buffer_6 | fixed_width(1);
-        cost_basis.set_text(U" Cost Basis" | ox::Trait::Bold);
+        cost_basis.set_text(U"   Cost Basis" | ox::Trait::Bold);
         cost_basis | fixed_width(13);
-        open_pl.set_text(U" Open P&L" | ox::Trait::Bold);
-        open_pl | align_right();
+        open_pl.set_text(U" Open P&L " | ox::Trait::Bold);
+        open_pl | align_right() | fixed_width(13);
+        daily_pl.set_text(U" Daily P&L " | ox::Trait::Bold);
+        daily_pl | align_right() | fixed_width(13);
     }
 };
 
