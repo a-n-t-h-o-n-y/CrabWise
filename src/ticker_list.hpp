@@ -422,11 +422,11 @@ class Listings : public ox::HTuple<Hamburger,
         buffer_3 | fixed_width(3);
         quantity | fixed_width(12);
         buffer_4 | fixed_width(2);
-        value | fixed_width(13);
+        value | fixed_width(14);
         buffer_5 | fixed_width(1);
         cost_basis | fixed_width(13);
-        open_pl | fixed_width(13);
-        daily_pl | fixed_width(13);
+        open_pl | fixed_width(14);
+        daily_pl | fixed_width(14);
     }
 
    public:
@@ -471,11 +471,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         listings.value.currency.set(asset.currency.quote);
         if (is_USD_like(asset_.currency.quote)) {
             listings.value.amount.round_to_hundredths(true);
-            listings.value.amount.set_offset(6);
+            listings.value.amount.set_offset(8);
             listings.open_pl.amount.round_to_hundredths(true);
-            listings.open_pl.amount.set_offset(6);
+            listings.open_pl.amount.set_offset(8);
             listings.daily_pl.amount.round_to_hundredths(true);
-            listings.daily_pl.amount.set_offset(6);
+            listings.daily_pl.amount.set_offset(8);
         }
         listings.name.set(asset);
 
@@ -742,14 +742,14 @@ class Column_labels : public ox::HArray<ox::HLabel, 16> {
         quantity | fixed_width(12);
         buffer_5 | fixed_width(2);
         value.set_text(U"Value " | ox::Trait::Bold);
-        value | align_right() | fixed_width(13);
+        value | align_right() | fixed_width(14);
         buffer_6 | fixed_width(1);
         cost_basis.set_text(U"   Cost Basis" | ox::Trait::Bold);
         cost_basis | fixed_width(13);
         open_pl.set_text(U"Open P&L " | ox::Trait::Bold);
-        open_pl | align_right() | fixed_width(13);
+        open_pl | align_right() | fixed_width(14);
         daily_pl.set_text(U"Daily P&L " | ox::Trait::Bold);
-        daily_pl | align_right() | fixed_width(13);
+        daily_pl | align_right() | fixed_width(14);
     }
 };
 
