@@ -46,6 +46,7 @@ class Net_totals : public ox::HTuple<ox::HLabel,
         using namespace ox::pipe;
         *this | fixed_height(1) | descendants() | bg(crab::Almost_bg);
 
+        // TODO use pipe::text
         title.set_text(U" Totals" | ox::Trait::Bold);
         title | fixed_width(21);
         buffer_1 | fixed_width(56);
@@ -191,15 +192,45 @@ class Flippers : public ox::HTuple<ox::Button, VLine, ox::Button> {
     }
 };
 
-class All_net_totals : public ox::HPair<Flippers, Net_totals_manager> {
+class Net_labels : public ox::HTuple<ox::Widget,
+                                     ox::HLabel,
+                                     ox::Widget,
+                                     ox::HLabel,
+                                     ox::HLabel,
+                                     ox::Widget> {
    public:
-    Flippers& flippers                     = this->first;
-    Net_totals_manager& net_totals_manager = this->second;
+    ox::Widget& buffer_1   = this->get<0>();
+    ox::HLabel& value      = this->get<1>();
+    ox::Widget& buffer_2   = this->get<2>();
+    ox::HLabel& open_pl    = this->get<3>();
+    ox::HLabel& daily_pl   = this->get<4>();
+    ox::Widget& buffer_end = this->get<5>();
+
+   public:
+    Net_labels()
+    {
+        using namespace ox::pipe;
+        *this | fixed_height(1);
+
+        buffer_1 | fixed_width(84);
+        value | fixed_width(14) | text(U"Value") | align_right();
+        buffer_2 | fixed_width(14);
+        open_pl | fixed_width(14) | text(U"Open P&L") | align_right();
+        daily_pl | fixed_width(14) | text(U"Daily P&L") | align_right();
+    }
+};
+
+class All_net_totals
+    : public ox::VPair<Net_labels, ox::HPair<Flippers, Net_totals_manager>> {
+   public:
+    Net_labels& labels                     = this->first;
+    Flippers& flippers                     = this->second.first;
+    Net_totals_manager& net_totals_manager = this->second.second;
 
    public:
     All_net_totals()
     {
-        *this | ox::pipe::fixed_height(1);
+        *this | ox::pipe::fixed_height(2);
         flippers.fwd.pressed.connect(
             [this] { net_totals_manager.flip_forward(); });
         flippers.bkwd.pressed.connect(

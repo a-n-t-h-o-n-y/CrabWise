@@ -117,7 +117,9 @@ class Listings : public ox::HTuple<Hamburger,
                                    Aligned_price_display,
                                    ox::Widget,
                                    Price_edit,
+                                   ox::Widget,
                                    Aligned_price_display,
+                                   ox::Widget,
                                    Aligned_price_display,
                                    ox::Widget,
                                    VLine,
@@ -138,11 +140,13 @@ class Listings : public ox::HTuple<Hamburger,
     Aligned_price_display& value    = this->get<12>();
     ox::Widget& buffer_5            = this->get<13>();
     Price_edit& cost_basis          = this->get<14>();
-    Aligned_price_display& open_pl  = this->get<15>();
-    Aligned_price_display& daily_pl = this->get<16>();
-    ox::Widget& buffer_6            = this->get<17>();
-    VLine& div2                     = this->get<18>();
-    Remove_btn& remove_btn          = this->get<19>();
+    ox::Widget& buffer_6            = this->get<15>();
+    Aligned_price_display& open_pl  = this->get<16>();
+    ox::Widget& buffer_7            = this->get<17>();
+    Aligned_price_display& daily_pl = this->get<18>();
+    ox::Widget& buffer_8            = this->get<19>();
+    VLine& div2                     = this->get<20>();
+    Remove_btn& remove_btn          = this->get<21>();
 
    public:
     Listings()
@@ -160,7 +164,9 @@ class Listings : public ox::HTuple<Hamburger,
         value | fixed_width(14);
         buffer_5 | fixed_width(1);
         cost_basis | fixed_width(13);
+        buffer_6 | fixed_width(1);
         open_pl | fixed_width(14);
+        buffer_7 | fixed_width(1);
         daily_pl | fixed_width(14);
     }
 
@@ -375,8 +381,13 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
             stats = existing->listings.current_stats();
 
         auto& child = this->make_child(asset, stats, quantity, cost_basis);
-        child.remove_me.connect(
-            [this, &child_ref = child] { this->remove_ticker(child_ref); });
+        child.remove_me.connect([this, &child_ref = child] {
+            auto const quote = child_ref.asset().currency.quote;
+            this->remove_ticker(child_ref);
+            value_total_updated.emit(quote, this->value_sum(quote));
+            open_pl_total_updated.emit(quote, this->open_pl_sum(quote));
+            daily_pl_total_updated.emit(quote, this->daily_pl_sum(quote));
+        });
         child.listings.hamburger.pressed.connect(
             [this, &child] { last_selected_ = &child; });
         child.listings.hamburger.install_event_filter(*this);
@@ -505,7 +516,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     }
 };
 
-class Column_labels : public ox::HArray<ox::HLabel, 16> {
+class Column_labels : public ox::HArray<ox::HLabel, 18> {
    public:
     ox::HLabel& buffer_1       = this->get<0>();
     ox::HLabel& name           = this->get<1>();
@@ -520,9 +531,11 @@ class Column_labels : public ox::HArray<ox::HLabel, 16> {
     ox::HLabel& value          = this->get<10>();
     ox::HLabel& buffer_6       = this->get<11>();
     ox::HLabel& cost_basis     = this->get<12>();
-    ox::HLabel& open_pl        = this->get<13>();
-    ox::HLabel& daily_pl       = this->get<14>();
-    ox::HLabel& buffer         = this->get<15>();
+    ox::HLabel& buffer_7       = this->get<13>();
+    ox::HLabel& open_pl        = this->get<14>();
+    ox::HLabel& buffer_8       = this->get<15>();
+    ox::HLabel& daily_pl       = this->get<16>();
+    ox::HLabel& buffer         = this->get<17>();
 
    public:
     Column_labels()
@@ -533,6 +546,7 @@ class Column_labels : public ox::HArray<ox::HLabel, 16> {
         name.set_text(U" Asset" | ox::Trait::Bold);
         name | fixed_width(21);
         buffer_2 | fixed_width(2);
+        // TODO use pipe::text
         last_price.set_text(U" Last Price" | ox::Trait::Bold);
         last_price | fixed_width(12);
         percent_change.set_text(U"Change " | ox::Trait::Bold);
@@ -544,14 +558,16 @@ class Column_labels : public ox::HArray<ox::HLabel, 16> {
         quantity.set_text(U"Quantity" | ox::Trait::Bold);
         quantity | fixed_width(12);
         buffer_5 | fixed_width(2);
-        value.set_text(U"Value " | ox::Trait::Bold);
+        value.set_text(U"Value" | ox::Trait::Bold);
         value | align_right() | fixed_width(14);
         buffer_6 | fixed_width(1);
         cost_basis.set_text(U"   Cost Basis" | ox::Trait::Bold);
         cost_basis | fixed_width(13);
-        open_pl.set_text(U"Open P&L " | ox::Trait::Bold);
+        buffer_7 | fixed_width(1);
+        open_pl.set_text(U"Open P&L" | ox::Trait::Bold);
         open_pl | align_right() | fixed_width(14);
-        daily_pl.set_text(U"Daily P&L " | ox::Trait::Bold);
+        buffer_8 | fixed_width(1);
+        daily_pl.set_text(U"Daily P&L" | ox::Trait::Bold);
         daily_pl | align_right() | fixed_width(14);
     }
 };
