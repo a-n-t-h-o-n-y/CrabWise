@@ -15,6 +15,7 @@
 #include "asset_picker.hpp"
 #include "filenames.hpp"
 #include "filesystem.hpp"
+#include "net_totals.hpp"
 #include "palette.hpp"
 #include "search_result.hpp"
 #include "ticker_list.hpp"
@@ -63,15 +64,17 @@ class App_space
           Asset_picker,
           ox::VTuple<ox::Widget,
                      Column_labels,
-                     ox::HTuple<ox::VTuple<Line, Ticker_list, ox::Widget>,
+                     ox::HTuple<ox::VTuple<HLine, Ticker_list, ox::Widget>,
                                 ox::VScrollbar>,
+                     All_net_totals,
                      Status_bar>> {
    public:
     Asset_picker& asset_picker = this->get<0>();
     ox::Widget& top_line       = this->get<1>().get<0>();
     Ticker_list& ticker_list   = this->get<1>().get<2>().get<0>().get<1>();
     ox::Widget& bottom_buffer  = this->get<1>().get<2>().get<0>().get<2>();
-    Status_bar& status_bar     = this->get<1>().get<3>();
+    All_net_totals& net_totals = this->get<1>().get<3>();
+    Status_bar& status_bar     = this->get<1>().get<4>();
     ox::VScrollbar& scrollbar  = this->get<1>().get<2>().get<1>();
 
    public:
@@ -100,6 +103,19 @@ class App_space
                 for (auto const& search_result : results)
                     asset_picker.search_results.add_result(search_result);
             });
+        ticker_list.value_total_updated.connect(
+            [this](std::string const& quote, double sum) {
+                net_totals.net_totals_manager.update_value(quote, sum);
+            });
+        ticker_list.open_pl_total_updated.connect(
+            [this](std::string const& quote, double sum) {
+                net_totals.net_totals_manager.update_open_pl(quote, sum);
+            });
+        ticker_list.daily_pl_total_updated.connect(
+            [this](std::string const& quote, double sum) {
+                net_totals.net_totals_manager.update_daily_pl(quote, sum);
+            });
+
         status_bar.save_btn.pressed.connect([this] { this->save_state(); });
     }
 

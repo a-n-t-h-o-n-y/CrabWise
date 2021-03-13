@@ -88,12 +88,12 @@ class Result_subgroup_btns
 class Results_subgroup
     : public ox::VTuple<
           ox::HLabel,
-          Line,
+          HLine,
           ox::HPair<ox::VScrollbar,
                     ox::VPair<Result_subgroup_btns, ox::Widget>>> {
    public:
     ox::HLabel& label          = this->get<0>();
-    Line& line                 = this->get<1>();
+    HLine& line                = this->get<1>();
     ox::VScrollbar& scrollbar  = this->get<2>().first;
     Result_subgroup_btns& btns = this->get<2>().second.first;
     ox::Widget& buffer         = this->get<2>().second.second;

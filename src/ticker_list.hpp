@@ -11,12 +11,17 @@
 #include <termox/common/filter_view.hpp>
 #include <termox/termox.hpp>
 
+#include "amount_display.hpp"
 #include "asset.hpp"
 #include "format_money.hpp"
 #include "line.hpp"
 #include "markets/markets.hpp"
 #include "palette.hpp"
+#include "percent_display.hpp"
 #include "price.hpp"
+#include "price_display.hpp"
+#include "price_edit.hpp"
+#include "quantity_edit.hpp"
 #include "stats.hpp"
 
 namespace crab {
@@ -24,15 +29,6 @@ namespace crab {
 class Hamburger : public ox::Button {
    public:
     Hamburger() : ox::Button{U"𝍢"} { *this | ox::pipe::fixed_width(3); };
-};
-
-class Div : public ox::Widget {
-   public:
-    Div()
-    {
-        *this | ox::pipe::wallpaper(U'│' | fg(crab::Gray)) |
-            ox::pipe::fixed_width(1);
-    }
 };
 
 class Asset_name : public ox::HArray<ox::HLabel, 4> {
@@ -75,272 +71,6 @@ class Asset_name : public ox::HArray<ox::HLabel, 4> {
     void set_quote(std::string const& x) { quote.set_text(x); }
 };
 
-class Quantity_edit : public ox::Textbox {
-   public:
-    sl::Signal<void(double)> quantity_updated;
-
-   public:
-    Quantity_edit()
-    {
-        *this | ox::pipe::fixed_height(1) | bg(crab::Almost_bg);
-        this->disable_scrollwheel();
-        this->initialize(0.);
-    }
-
-    void initialize(double value)
-    {
-        auto display = std::to_string(value);
-        if (value == 0.)
-            display = "0";
-        else {
-            format_decimal_zeros(display);
-            insert_thousands_separators(display);
-        }
-        this->set_contents(display);
-        quantity_updated.emit(value);
-        value_ = value;
-    }
-
-    // TODO Change to as_double?
-    auto quantity() const -> double { return value_; }
-
-   protected:
-    auto key_press_event(ox::Key k) -> bool override
-    {
-        switch (k) {
-            case ox::Key::Backspace:
-            case ox::Key::Backspace_1:
-            case ox::Key::Backspace_2:
-            case ox::Key::Delete: {
-                auto const result = Textbox::key_press_event(k);
-                if (auto const dbl = get_double(this->contents().str()); dbl) {
-                    value_ = *dbl;
-                    quantity_updated.emit(value_);
-                }
-                return result;
-            }
-            case ox::Key::Arrow_right:
-            case ox::Key::Arrow_left:
-            case ox::Key::Arrow_up:
-            case ox::Key::Arrow_down: return Textbox::key_press_event(k);
-            default: break;
-        }
-        if (static_cast<std::underlying_type_t<ox::Key>>(k) > 127)
-            return true;
-
-        auto const ch = key_to_char(k);
-        if (validate_char(ch)) {
-            if (auto const dbl = get_double(this->generate_string(ch)); dbl) {
-                value_ = *dbl;
-                quantity_updated.emit(value_);
-                return Textbox::key_press_event(k);
-            }
-        }
-        return true;
-    }
-
-   private:
-    /// Generate the string that will be made once the char is commited.
-    /** Used for validation before sending the char to the Textbox base class */
-    auto generate_string(char c) -> std::string
-    {
-        auto result = this->contents().str();
-        result.insert(this->cursor_index(), 1, c);
-        return result;
-    }
-
-   private:
-    [[nodiscard]] static auto validate_char(char c) -> bool
-    {
-        return std::isdigit(c) || c == ',' || c == '.';
-    }
-
-    /// Returns parsed double if valid, std::nullopt if not valid.
-    [[nodiscard]] static auto get_double(std::string input)
-        -> std::optional<double>
-    {
-        input.erase(std::remove(std::begin(input), std::end(input), ','),
-                    std::end(input));
-        if (input.empty() || input == ".")
-            return 0.;
-        auto count = std::size_t{0};
-        try {
-            auto const result = std::stod(input, &count);
-            if (count == input.size())
-                return result;
-            else
-                return std::nullopt;
-        }
-        catch (std::exception const&) {
-            return std::nullopt;
-        }
-    }
-
-   private:
-    double value_ = 0;
-};
-
-/// Settable as a string abbriviation, displayed in its symbolic representation.
-class Currency_display : public ox::HLabel {
-   public:
-    Currency_display(std::string x = "")
-    {
-        using namespace ox::pipe;
-        *this | fixed_width(3) | fixed_height(1) | align_center();
-        if (!x.empty())
-            this->set(std::move(x));
-    }
-
-   public:
-    /// Set the currency to display, \p x is a string abbriviation.
-    /** Uses an underscore if no symbol found for the given currency. */
-    void set(std::string x)
-    {
-        currency_ = std::move(x);
-        this->ox::HLabel::set_text(currency_to_symbol(currency_));
-    }
-
-    /// Return the string abbriviation currency was set with.
-    [[nodiscard]] auto currency() const -> std::string const&
-    {
-        return currency_;
-    }
-
-   private:
-    std::string currency_;
-};
-
-/// Displays an amount passed in as a string or double.
-/** Inserts thousands separators and formats decimal zeros if needed. */
-class Amount_display : public ox::HLabel {
-   public:
-    sl::Signal<void(double)> amount_updated;
-
-   public:
-    void set(double amount)
-    {
-        double_ = amount;
-        string_ = std::to_string(amount);
-        format_decimal_zeros(string_);
-        insert_thousands_separators(string_);
-        this->ox::HLabel::set_text(string_);
-        amount_updated.emit(double_);
-    }
-
-    void set(std::string amount)
-    {
-        string_ = std::move(amount);
-        double_ = std::stod(string_);
-        format_decimal_zeros(string_);
-        insert_thousands_separators(string_);
-        this->ox::HLabel::set_text(string_);
-        amount_updated.emit(double_);
-    }
-
-    /// Return set value as a double.
-    [[nodiscard]] auto as_double() const -> double { return double_; }
-
-    /// Return set value as it was passed in, without formatting.
-    [[nodiscard]] auto as_string() const -> std::string const&
-    {
-        return string_;
-    }
-
-   private:
-    double double_;
-    std::string string_;
-};
-
-struct Price_display : ox::HPair<Currency_display, Amount_display> {
-    Currency_display& currency = this->first;
-    Amount_display& amount     = this->second;
-};
-
-struct Price_edit : ox::HPair<Currency_display, Quantity_edit> {
-    Currency_display& currency = this->first;
-    Quantity_edit& amount      = this->second;
-};
-
-/// Displays an amount passed in as a string or double, aligns on decimal place.
-/** Inserts thousands separators and formats decimal zeros if needed, \p offset
- *  is used for decimal alignment, if \p hundredths_round is true, rounds. */
-class Aligned_amount_display : public ox::HLabel {
-   public:
-    sl::Signal<void(double)> amount_updated;
-
-   public:
-    void set(double amount)
-    {
-        double_ = amount;
-        if (round_hundredths_)
-            string_ = round_and_to_string(amount, 2);
-        else
-            string_ = std::to_string(amount);
-        format_decimal_zeros(string_);
-        insert_thousands_separators(string_);
-        string_ = align_decimal(string_, offset_);
-        this->ox::HLabel::set_text(string_);
-        amount_updated.emit(double_);
-    }
-
-    void set(std::string amount) { this->set(std::stod(amount)); }
-
-    void set_offset(std::size_t x)
-    {
-        offset_ = x;
-        if (!string_.empty())
-            this->set(string_);
-    }
-
-    void round_to_hundredths(bool x)
-    {
-        round_hundredths_ = x;
-        if (!string_.empty())
-            this->set(string_);
-    }
-
-    /// Return set value as a double.
-    [[nodiscard]] auto as_double() const -> double { return double_; }
-
-    /// Return set value as it was passed in, without formatting.
-    [[nodiscard]] auto as_string() const -> std::string const&
-    {
-        return string_;
-    }
-
-   private:
-    double double_;
-    std::string string_;
-    std::size_t offset_    = 0;
-    bool round_hundredths_ = false;
-};
-
-/// Aligned price display and potential rounding to hundredths.
-class Aligned_price_display
-    : public ox::HPair<Currency_display, Aligned_amount_display> {
-   public:
-    Currency_display& currency     = this->first;
-    Aligned_amount_display& amount = this->second;
-};
-
-class Percent_display : public ox::HArray<ox::HLabel, 2> {
-   public:
-    Percent_display()
-    {
-        using namespace ox::pipe;
-        value | align_right();
-        symbol | fixed_width(3) | align_center();
-        symbol.set_text(U"%");
-    }
-
-   public:
-    void set_percent(double x) { value.set_text(round_and_to_string(x, 2)); }
-
-   public:
-    ox::HLabel& value  = this->get<0>();
-    ox::HLabel& symbol = this->get<1>();
-};
-
 class Indicator : public ox::Notify_light {
    public:
     Indicator() { this->set_duration(ox::Notify_light::Duration_t{220}); }
@@ -374,7 +104,7 @@ class Remove_btn : public ox::Button {
 
 class Listings : public ox::HTuple<Hamburger,
                                    ox::Widget,
-                                   Div,
+                                   VLine,
                                    Asset_name,
                                    Indicator,
                                    Price_display,
@@ -390,12 +120,12 @@ class Listings : public ox::HTuple<Hamburger,
                                    Aligned_price_display,
                                    Aligned_price_display,
                                    ox::Widget,
-                                   Div,
+                                   VLine,
                                    Remove_btn> {
    public:
     Hamburger& hamburger            = this->get<0>();
     ox::Widget& buffer_1            = this->get<1>();
-    Div& div1                       = this->get<2>();
+    VLine& div1                     = this->get<2>();
     Asset_name& name                = this->get<3>();
     Indicator& indicator            = this->get<4>();
     Price_display& last_price       = this->get<5>();
@@ -411,7 +141,7 @@ class Listings : public ox::HTuple<Hamburger,
     Aligned_price_display& open_pl  = this->get<15>();
     Aligned_price_display& daily_pl = this->get<16>();
     ox::Widget& buffer_6            = this->get<17>();
-    Div& div2                       = this->get<18>();
+    VLine& div2                     = this->get<18>();
     Remove_btn& remove_btn          = this->get<19>();
 
    public:
@@ -455,15 +185,15 @@ class Curve : public ox::Widget {
     }
 };
 
-class Divider : public ox::HTuple<Empty, Curve, Line> {
+class Bottom_line : public ox::HTuple<Empty, Curve, HLine> {
    public:
-    Divider() { *this | ox::pipe::fixed_height(1); }
+    Bottom_line() { *this | ox::pipe::fixed_height(1); }
 };
 
-class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
+class Ticker : public ox::Passive<ox::VPair<Listings, Bottom_line>> {
    public:
-    Listings& listings = this->first;
-    Divider& divider   = this->second;
+    Listings& listings       = this->first;
+    Bottom_line& bottom_line = this->second;
 
     sl::Signal<void()>& remove_me = listings.remove_btn.remove_me;
 
@@ -518,10 +248,11 @@ class Ticker : public ox::Passive<ox::VPair<Listings, Divider>> {
         auto count       = std::size_t{0};
         auto const newer = std::stod(value, &count);
         assert(count == value.size());
-        last_price_ = newer;
-        if (newer > last_price_)
+        auto const older = last_price_;
+        last_price_      = newer;
+        if (newer > older)
             listings.indicator.emit_positive();
-        else if (newer < last_price_)
+        else if (newer < older)
             listings.indicator.emit_negative();
         this->recalculate_percent_change();
         this->update_value(listings.quantity.quantity(),
@@ -596,6 +327,12 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    private:
     using Base_t = ox::Passive<ox::layout::Vertical<Ticker>>;
 
+   public:
+    // Sends quote currency and sum
+    sl::Signal<void(std::string const&, double)> value_total_updated;
+    sl::Signal<void(std::string const&, double)> open_pl_total_updated;
+    sl::Signal<void(std::string const&, double)> daily_pl_total_updated;
+
    private:
     /// Return pointer to first Ticker if asset matches, nullptr if can't find.
     [[nodiscard]] auto find_ticker(Asset const& asset) -> Ticker*
@@ -605,7 +342,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     }
 
     /// Returns a filtered view of all Tickers holding the given \p asset.
-    [[nodiscard]] auto ticker_view(Asset const& asset)
+    [[nodiscard]] auto asset_ticker_view(Asset const& asset)
     {
         return ox::Owning_filter_view{
             this->get_children(),
@@ -643,6 +380,18 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
         child.listings.hamburger.pressed.connect(
             [this, &child] { last_selected_ = &child; });
         child.listings.hamburger.install_event_filter(*this);
+        child.listings.value.amount.amount_updated.connect(
+            [quote = child.asset().currency.quote, this](double) {
+                value_total_updated.emit(quote, this->value_sum(quote));
+            });
+        child.listings.open_pl.amount.amount_updated.connect(
+            [quote = child.asset().currency.quote, this](double) {
+                open_pl_total_updated.emit(quote, this->open_pl_sum(quote));
+            });
+        child.listings.daily_pl.amount.amount_updated.connect(
+            [quote = child.asset().currency.quote, this](double) {
+                daily_pl_total_updated.emit(quote, this->daily_pl_sum(quote));
+            });
     }
 
     void remove_ticker(Ticker& ticker_ref)
@@ -658,7 +407,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     /// Update the last price of each Ticker with the Asset within \p price.
     void update_ticker(Price price)
     {
-        for (Ticker& child : ticker_view(price.asset))
+        for (Ticker& child : asset_ticker_view(price.asset))
             child.update_last_price(price.value);
     }
 
@@ -667,7 +416,7 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     void init_ticker(Asset const& asset, Stats const& stats)
     {
         auto const current_str = std::to_string(stats.last_price);
-        for (Ticker& child : ticker_view(asset)) {
+        for (Ticker& child : asset_ticker_view(asset)) {
             child.update_last_close(stats.last_close);
             child.update_last_price(current_str);
         }
@@ -710,6 +459,50 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
    public:
     sl::Signal<void(std::vector<Search_result> const&)>&
         search_results_received = markets_.search_results_received;
+
+   private:
+    /// Returns a lambda that takes a Ticker and returns true if \p q matches.
+    [[nodiscard]] static auto matches_quote(std::string const& q)
+    {
+        return [q](Ticker const& t) { return t.asset().currency.quote == q; };
+    }
+
+    /// Return Container view of all Ticker children that have the given quote.
+    [[nodiscard]] auto quote_ticker_view(std::string const& quote) const
+    {
+        return ox::Owning_filter_view{this->get_children(),
+                                      matches_quote(quote)};
+    }
+
+    /// Get the Value column sum of all Tickers with \p quote_currency.
+    [[nodiscard]] auto value_sum(std::string const& quote_currency) const
+        -> double
+    {
+        auto sum = 0.;
+        for (Ticker const& child : quote_ticker_view(quote_currency))
+            sum += child.listings.value.amount.as_double();
+        return sum;
+    }
+
+    /// Get the Open P&L column sum of all Tickers with \p quote_currency.
+    [[nodiscard]] auto open_pl_sum(std::string const& quote_currency) const
+        -> double
+    {
+        auto sum = 0.;
+        for (Ticker const& child : quote_ticker_view(quote_currency))
+            sum += child.listings.open_pl.amount.as_double();
+        return sum;
+    }
+
+    /// Get the Daily P&L column sum of all Tickers with \p quote_currency.
+    [[nodiscard]] auto daily_pl_sum(std::string const& quote_currency) const
+        -> double
+    {
+        auto sum = 0.;
+        for (Ticker const& child : quote_ticker_view(quote_currency))
+            sum += child.listings.daily_pl.amount.as_double();
+        return sum;
+    }
 };
 
 class Column_labels : public ox::HArray<ox::HLabel, 16> {

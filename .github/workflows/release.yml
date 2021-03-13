@@ -24,13 +24,13 @@ jobs:
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${RELEASE_VERSION}"
+          automatic_release_tag: "${{ env.RELEASE_VERSION }}"
           prerelease: false
-          title: "MacOS 10.15 Build ${RELEASE_VERSION}"
+          title: "MacOS 10.15 Build ${{ env.RELEASE_VERSION }}"
       - uses: "svenstaro/upload-release-action@v2"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           file: ./build/src/crabwise
           asset_name: crabwise
-          tag: "${RELEASE_VERSION}"
+          tag: "${{ env.RELEASE_VERSION }}"
           overwrite: false

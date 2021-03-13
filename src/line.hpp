@@ -6,13 +6,25 @@
 
 namespace crab {
 
+// TODO possibly move into TermOx
+
 /// Simple Horizontal line element used throughout app.
-class Line : public ox::Widget {
+class HLine : public ox::Widget {
    public:
-    Line()
+    HLine()
     {
         *this | ox::pipe::wallpaper(U'─' | fg(crab::Gray)) |
             ox::pipe::fixed_height(1);
+    }
+};
+
+/// Simple Vertical line element used throughout app.
+class VLine : public ox::Widget {
+   public:
+    VLine()
+    {
+        *this | ox::pipe::wallpaper(U'│' | fg(crab::Gray)) |
+            ox::pipe::fixed_width(1);
     }
 };
 
