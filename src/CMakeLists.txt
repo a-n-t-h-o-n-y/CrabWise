@@ -8,6 +8,7 @@ add_executable(crabwise
     crabwise.main.cpp
 )
 
+set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.66 REQUIRED COMPONENTS filesystem)
 
 target_link_libraries(crabwise
