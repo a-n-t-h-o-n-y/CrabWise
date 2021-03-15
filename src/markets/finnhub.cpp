@@ -41,7 +41,7 @@ using JSON_element_t = simdjson::simdjson_result<simdjson::dom::element>;
         return {};
     auto const array = e["data"];
     auto result      = std::vector<crab::Price>{};
-    for (auto const& item : array) {
+    for (auto item : array) {
         auto const symbol_id = (std::string)item["s"];
         result.push_back({std::to_string((double)item["p"]),
                           id_cache.find_asset(symbol_id)});
@@ -104,7 +104,7 @@ auto Finnhub::search(std::string const& query) -> std::vector<Search_result>
 
         auto result      = std::vector<Search_result>{};
         auto const array = https_json_parser().parse(message.body)["result"];
-        for (auto const& x : array) {
+        for (auto x : array) {
             auto const description = (std::string)x["description"];
             auto const symbol_id   = (std::string)x["symbol"];
             auto const type        = (std::string)x["type"];
