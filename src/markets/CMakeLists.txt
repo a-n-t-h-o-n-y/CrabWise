@@ -5,7 +5,6 @@ add_library(markets
     finnhub.cpp
 )
 
-set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.66 REQUIRED COMPONENTS filesystem)
 
 target_link_libraries(markets PRIVATE ntwk simdjson Boost::filesystem)
