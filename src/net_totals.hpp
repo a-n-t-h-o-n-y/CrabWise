@@ -1,8 +1,6 @@
 #ifndef CRAB_NET_TOTALS_HPP
 #define CRAB_NET_TOTALS_HPP
 #include <termox/termox.hpp>
-#include <termox/widget/pipe.hpp>
-#include <termox/widget/widget.hpp>
 
 #include "line.hpp"
 #include "palette.hpp"
@@ -77,7 +75,7 @@ class Net_totals : public ox::HTuple<ox::HLabel,
     }
 };
 
-// Page one is blank.
+// Page one is blank until first totals are added.
 class Net_totals_container : public ox::layout::Stack<Net_totals> {
    public:
     Net_totals_container()
@@ -91,9 +89,12 @@ class Net_totals_container : public ox::layout::Stack<Net_totals> {
     /// Add a new child Widget associated with \p quote currency.
     auto append_net_totals(std::string const& quote) -> Net_totals&
     {
-        auto& child = this->make_page(quote);
-        if (this->child_count() == 2)
-            this->set_active_page(1);
+        if (!child_added_)
+            this->remove_and_delete_child_at(0);
+        child_added_ = true;
+        auto& child  = this->make_page(quote);
+        if (this->child_count() == 1)
+            this->set_active_page(0);
         return child;
     }
 
@@ -125,6 +126,9 @@ class Net_totals_container : public ox::layout::Stack<Net_totals> {
         return this->find_child_if(
             [&quote](Net_totals& child) { return child.quote() == quote; });
     }
+
+   private:
+    bool child_added_ = false;
 };
 
 class Net_totals_manager : public Net_totals_container {
@@ -156,11 +160,10 @@ class Net_totals_manager : public Net_totals_container {
         auto const active_page = this->active_page_index();
         if (child_count == 1)
             return;
-        if ((active_page + 1) == child_count) {
-            this->set_active_page(1);
-            return;
-        }
-        this->set_active_page(active_page + 1);
+        if ((active_page + 1) == child_count)
+            this->set_active_page(0);
+        else
+            this->set_active_page(active_page + 1);
     }
 
     void flip_backward()
@@ -169,9 +172,10 @@ class Net_totals_manager : public Net_totals_container {
         auto const active_page = this->active_page_index();
         if (child_count == 1)
             return;
-        if (active_page == 1)
+        if (active_page == 0)
             this->set_active_page(child_count - 1);
-        this->set_active_page(active_page - 1);
+        else
+            this->set_active_page(active_page - 1);
     }
 };
 
