@@ -17,11 +17,22 @@ class Percent_display : public ox::HArray<ox::HLabel, 2> {
     }
 
    public:
-    void set_percent(double x) { value.set_text(round_and_to_string(x, 2)); }
+    /// Set percent, assumes it is scaled to 100's already.
+    void set_percent(double x)
+    {
+        value_ = x;
+        value.set_text(round_and_to_string(x, 2));
+    }
+
+    /// Return the set percent, scalled to 100's
+    [[nodiscard]] auto get_percent() const -> double { return value_; }
 
    public:
     ox::HLabel& value  = this->get<0>();
     ox::HLabel& symbol = this->get<1>();
+
+   private:
+    double value_ = 0.;
 };
 
 }  // namespace crab

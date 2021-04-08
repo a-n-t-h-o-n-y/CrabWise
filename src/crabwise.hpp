@@ -70,6 +70,7 @@ class App_space
                      Status_bar>> {
    public:
     Asset_picker& asset_picker = this->get<0>();
+    Column_labels& labels      = this->get<1>().get<1>();
     ox::Widget& top_line       = this->get<1>().get<0>();
     Ticker_list& ticker_list   = this->get<1>().get<2>().get<0>().get<1>();
     ox::Widget& bottom_buffer  = this->get<1>().get<2>().get<0>().get<2>();
@@ -117,6 +118,8 @@ class App_space
             });
 
         status_bar.save_btn.pressed.connect([this] { this->save_state(); });
+
+        setup_column_sorting(*this);
     }
 
    private:
@@ -160,6 +163,109 @@ class App_space
             exchange = child.asset().exchange;
         }
         return result;
+    }
+
+    static void setup_column_sorting(App_space& w)
+    {
+        using namespace ox::pipe;
+        auto constexpr to_lower = [](std::string const& x) -> std::string {
+            auto result = std::string{};
+            for (unsigned char c : x)
+                result.push_back(std::tolower(c));
+            return result;
+        };
+        auto const hook_up = [&w](auto& label_widget, auto const& asc_comp,
+                                  auto const& desc_comp) {
+            label_widget |
+                on_mouse_press([&w, &asc_comp, &desc_comp,
+                                ascending = false](auto const& m) mutable {
+                    if (m.button == ox::Mouse::Button::Left) {
+                        if (ascending)
+                            w.ticker_list.sort(asc_comp);
+                        else
+                            w.ticker_list.sort(desc_comp);
+                        ascending = !ascending;
+                    }
+                });
+        };
+
+        // Value
+        auto value_acomp = [](auto const& a, auto const& b) {
+            return a.listings.value.amount.as_double() <
+                   b.listings.value.amount.as_double();
+        };
+        auto value_dcomp = [](auto const& a, auto const& b) {
+            return a.listings.value.amount.as_double() >
+                   b.listings.value.amount.as_double();
+        };
+        hook_up(w.labels.value, value_acomp, value_dcomp);
+
+        // Open P&L
+        auto open_pl_acomp = [](auto const& a, auto const& b) {
+            return a.listings.open_pl.amount.as_double() <
+                   b.listings.open_pl.amount.as_double();
+        };
+        auto open_pl_dcomp = [](auto const& a, auto const& b) {
+            return a.listings.open_pl.amount.as_double() >
+                   b.listings.open_pl.amount.as_double();
+        };
+        hook_up(w.labels.open_pl, open_pl_acomp, open_pl_dcomp);
+
+        // Daily P&L
+        auto daily_pl_acomp = [](auto const& a, auto const& b) {
+            return a.listings.daily_pl.amount.as_double() <
+                   b.listings.daily_pl.amount.as_double();
+        };
+        auto daily_pl_dcomp = [](auto const& a, auto const& b) {
+            return a.listings.daily_pl.amount.as_double() >
+                   b.listings.daily_pl.amount.as_double();
+        };
+        hook_up(w.labels.daily_pl, daily_pl_acomp, daily_pl_dcomp);
+
+        // % Change
+        auto percent_change_acomp = [](auto const& a, auto const& b) {
+            return a.listings.percent_change.get_percent() <
+                   b.listings.percent_change.get_percent();
+        };
+        auto percent_change_dcomp = [](auto const& a, auto const& b) {
+            return a.listings.percent_change.get_percent() >
+                   b.listings.percent_change.get_percent();
+        };
+        hook_up(w.labels.percent_change, percent_change_acomp,
+                percent_change_dcomp);
+
+        // Base
+        auto base_acomp = [](auto const& a, auto const& b) {
+            return a.listings.name.base.get_text().str() >
+                   b.listings.name.base.get_text().str();
+        };
+        auto base_dcomp = [](auto const& a, auto const& b) {
+            return a.listings.name.base.get_text().str() <
+                   b.listings.name.base.get_text().str();
+        };
+        hook_up(w.labels.base, base_acomp, base_dcomp);
+
+        // Market
+        auto market_acomp = [to_lower](auto const& a, auto const& b) {
+            return to_lower(a.listings.name.market.get_text().str()) >
+                   to_lower(b.listings.name.market.get_text().str());
+        };
+        auto market_dcomp = [to_lower](auto const& a, auto const& b) {
+            return to_lower(a.listings.name.market.get_text().str()) <
+                   to_lower(b.listings.name.market.get_text().str());
+        };
+        hook_up(w.labels.market, market_acomp, market_dcomp);
+
+        // Quote
+        auto quote_acomp = [to_lower](auto const& a, auto const& b) {
+            return to_lower(a.listings.name.quote.get_text().str()) >
+                   to_lower(b.listings.name.quote.get_text().str());
+        };
+        auto quote_dcomp = [to_lower](auto const& a, auto const& b) {
+            return to_lower(a.listings.name.quote.get_text().str()) <
+                   to_lower(b.listings.name.quote.get_text().str());
+        };
+        hook_up(w.labels.quote, quote_acomp, quote_dcomp);
     }
 };
 

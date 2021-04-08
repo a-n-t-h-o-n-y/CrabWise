@@ -33,20 +33,20 @@ class Hamburger : public ox::Button {
 
 class Asset_name : public ox::HArray<ox::HLabel, 4> {
    public:
-    ox::HLabel& buffer   = this->get<0>();
-    ox::HLabel& exchange = this->get<1>();
-    ox::HLabel& base     = this->get<2>();
-    ox::HLabel& quote    = this->get<3>();
+    ox::HLabel& buffer = this->get<0>();
+    ox::HLabel& base   = this->get<1>();
+    ox::HLabel& market = this->get<2>();
+    ox::HLabel& quote  = this->get<3>();
 
    public:
     Asset_name()
     {
         using namespace ox::pipe;
         buffer | fixed_width(1);
-        exchange | fixed_width(10);
+        market | fixed_width(10);
         base | fixed_width(6) | ox::Trait::Bold;
         quote | ox::Trait::Dim;
-        *this | fixed_width(21);
+        *this | fixed_width(22);
     }
 
    public:
@@ -61,9 +61,9 @@ class Asset_name : public ox::HArray<ox::HLabel, 4> {
     void set_exchange(std::string const& x)
     {
         if (x.empty())
-            exchange.set_text(U"Stock");
+            market.set_text(U"Stock");
         else
-            exchange.set_text(x);
+            market.set_text(x);
     }
 
     void set_base(std::string const& x) { base.set_text(x); }
@@ -516,26 +516,28 @@ class Ticker_list : public ox::Passive<ox::layout::Vertical<Ticker>> {
     }
 };
 
-class Column_labels : public ox::HArray<ox::HLabel, 18> {
+class Column_labels : public ox::HArray<ox::HLabel, 20> {
    public:
     ox::HLabel& buffer_1       = this->get<0>();
-    ox::HLabel& name           = this->get<1>();
-    ox::HLabel& buffer_2       = this->get<2>();
-    ox::HLabel& last_price     = this->get<3>();
-    ox::HLabel& percent_change = this->get<4>();
-    ox::HLabel& buffer_3       = this->get<5>();
-    ox::HLabel& last_close     = this->get<6>();
-    ox::HLabel& buffer_4       = this->get<7>();
-    ox::HLabel& quantity       = this->get<8>();
-    ox::HLabel& buffer_5       = this->get<9>();
-    ox::HLabel& value          = this->get<10>();
-    ox::HLabel& buffer_6       = this->get<11>();
-    ox::HLabel& cost_basis     = this->get<12>();
-    ox::HLabel& buffer_7       = this->get<13>();
-    ox::HLabel& open_pl        = this->get<14>();
-    ox::HLabel& buffer_8       = this->get<15>();
-    ox::HLabel& daily_pl       = this->get<16>();
-    ox::HLabel& buffer         = this->get<17>();
+    ox::HLabel& base           = this->get<1>();
+    ox::HLabel& market         = this->get<2>();
+    ox::HLabel& quote          = this->get<3>();
+    ox::HLabel& buffer_2       = this->get<4>();
+    ox::HLabel& last_price     = this->get<5>();
+    ox::HLabel& percent_change = this->get<6>();
+    ox::HLabel& buffer_3       = this->get<7>();
+    ox::HLabel& last_close     = this->get<8>();
+    ox::HLabel& buffer_4       = this->get<9>();
+    ox::HLabel& quantity       = this->get<10>();
+    ox::HLabel& buffer_5       = this->get<11>();
+    ox::HLabel& value          = this->get<12>();
+    ox::HLabel& buffer_6       = this->get<13>();
+    ox::HLabel& cost_basis     = this->get<14>();
+    ox::HLabel& buffer_7       = this->get<15>();
+    ox::HLabel& open_pl        = this->get<16>();
+    ox::HLabel& buffer_8       = this->get<17>();
+    ox::HLabel& daily_pl       = this->get<18>();
+    ox::HLabel& buffer         = this->get<19>();
 
    public:
     Column_labels()
@@ -543,10 +545,17 @@ class Column_labels : public ox::HArray<ox::HLabel, 18> {
         using namespace ox::pipe;
         *this | fixed_height(1);
         buffer_1 | fixed_width(5);
-        name.set_text(U" Asset" | ox::Trait::Bold);
-        name | fixed_width(21);
-        buffer_2 | fixed_width(2);
+
         // TODO use pipe::text
+
+        base.set_text(U"Base" | ox::Trait::Bold);
+        base | fixed_width(6);
+        market.set_text(U" Market");
+        market | fixed_width(9);
+        quote.set_text(U"  Quote");
+        quote | fixed_width(7);
+
+        buffer_2 | fixed_width(2);
         last_price.set_text(U" Last Price" | ox::Trait::Bold);
         last_price | fixed_width(12);
         percent_change.set_text(U"Change " | ox::Trait::Bold);
